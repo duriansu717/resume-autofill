@@ -306,6 +306,85 @@ check('学历下拉被识别为学历', () => {
   assertEq(topKeyName(d), 'educations.degree');
 });
 
+check('从 id / name 推断区块和「第几条经历」', () => {
+  const mkNode = (attrs, parent) => ({
+    parentElement: parent || null,
+    getAttribute(k) {
+      return attrs && Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null;
+    },
+  });
+
+  const direct = RA.section.sectionFromId(mkNode({ id: 'resume_education_form_time[0]' }));
+  assertEq(direct.key, 'education');
+  assertEq(direct.entryIndex, 0);
+
+  // 输入框自己没有 id，但祖先容器有
+  const parent = mkNode({ id: 'resume_education_form_time[1]' });
+  const child = mkNode({}, parent);
+  const inherited = RA.section.sectionFromId(child);
+  assertEq(inherited.key, 'education');
+  assertEq(inherited.entryIndex, 1);
+
+  // 字段名里的 school 不算区块词，否则 schoolEmail 会被误判成教育经历
+  assertEq(RA.section.sectionFromId(mkNode({ id: 'schoolEmail' })), null);
+
+  assertEq(RA.section.entryIndexFromId('education[0].school'), 0);
+  assertEq(RA.section.entryIndexFromId('work_experience_2_company'), 2);
+});
+
+check('「学校所在地」不会被当成学校名，真正的学校字段能拿回槽位', () => {
+  // 网申页面同时有「学校所在地」（城市）和「学校」（下拉）。
+  // 学校的别名「学校」命中「学校所在地」，抢走了 school 槽位，
+  // 结果城市框被填成学校名，真正的学校下拉反而没填。
+  const city = mk({
+    labelText: '学校所在地', labelSource: 'for',
+    id: 'schoolCityCode', nearbyText: ['学校所在地'],
+  });
+  const school = mk({
+    labelText: '学校', labelSource: 'for',
+    id: 'resume_education_form_schoolId[0]',
+  });
+
+  const matches = RA.score.match([city, school]);
+  const byD = new Map(matches.map((m) => [m.d, m.key]));
+
+  assertEq(byD.get(city), 'educations.city', '学校所在地');
+  assertEq(byD.get(school), 'educations.school', '学校');
+});
+
+check('「时间 / 至」区间：入学与毕业都能过填充阈值', () => {
+  // 网易网申的样子：两个日期控件共用一个「时间」标签，
+  // 开始框靠 placeholder「入校时间」，结束框靠中间的「至」。
+  const section = { key: 'education', entryIndex: 0 };
+  const start = mk({
+    labelText: '时间', labelSource: 'framework',
+    placeholder: '入校时间',
+    className: 'ant-calendar-picker-input ant-input',
+    nearbyText: ['时间 至'],
+  }, section);
+  const end = mk({
+    labelText: '至', labelSource: 'geometric',
+    placeholder: '按“yyyy-mm”格式输入',
+    className: 'ant-calendar-picker-input ant-input',
+  }, section);
+
+  const matches = RA.score.match([start, end]);
+  const byD = new Map(matches.map((m) => [m.d, m]));
+
+  assertEq(byD.get(start) && byD.get(start).key, 'educations.startDate', '入学时间');
+  assertEq(byD.get(end) && byD.get(end).key, 'educations.endDate', '毕业时间');
+
+  // 低于 0.5 的话 doFill 会直接跳过，等于没填
+  assert(byD.get(end).score >= 0.5, '结束时间的分数没过填充阈值：' + byD.get(end).score.toFixed(2));
+});
+
+check('所在学院 / 导师 / 荣誉奖项有对应字段', () => {
+  assertEq(topKeyName(mk({ labelText: '所在学院', labelSource: 'for' })), 'educations.college');
+  assertEq(topKeyName(mk({ labelText: '导师姓名', labelSource: 'for' })), 'educations.mentor');
+  assertEq(topKeyName(mk({ labelText: '导师', labelSource: 'for' })), 'educations.mentor');
+  assertEq(topKeyName(mk({ kind: 'textarea', labelText: '荣誉奖项', labelSource: 'for' })), 'educations.honors');
+});
+
 check('组件内部 0×0 的隐藏 input 不参与匹配', () => {
   // atsx-date-picker-period-hidden-input 这类控件只负责存值，
   // 真正可操作的是它旁边可见的选择器。让它参与匹配只会抢走槽位。

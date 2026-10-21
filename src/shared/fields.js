@@ -18,16 +18,24 @@
   const RA = root.RA;
 
   /** 日期类字段在经历块里共享的弱别名 */
+  // 日期控件本身的痕迹（class / placeholder 里的 yyyy、calendar…）。
+  // 它不能区分开始/结束，但能证明「这是一个日期字段」，
+  // 对「标签只写『时间』、靠『至』分隔」的区间控件很关键。
+  const DATE_FORMAT_TOKENS = [
+    'datepicker', 'date-picker', 'calendar', 'yyyy', 'yyyy-mm', 'yyyy-mm-dd',
+    '日期选择', '时间选择',
+  ];
+
   const DATE_START_GENERIC = [
     '开始时间', '起始时间', '开始日期', '起始日期', '起止时间', '起止日期',
     '开始', '起始', 'from', 'start', 'startdate', 'begindate', 'begin',
-  ];
+  ].concat(DATE_FORMAT_TOKENS);
   // 「起止时间」同时给 start 和 end：一个表单项里放两个日期控件、标签只写
   // 「起止时间」的布局很常见，靠「一个槽位只能占一次」把第二个分给结束时间。
   const DATE_END_GENERIC = [
     '结束时间', '终止时间', '结束日期', '终止日期', '截止时间', '起止时间', '起止日期',
     '结束', '终止', '至', 'to', 'end', 'enddate', 'todate', 'finish',
-  ];
+  ].concat(DATE_FORMAT_TOKENS);
 
   // 区间总标签：只对教育 / 工作生效，所以放在各自的 generic 里，
   // 不放进全局别名表（那会被其它模块抢走）
@@ -126,7 +134,7 @@
     {
       key: 'basic.hometown', section: 'basic', label: '籍贯',
       // 「户籍/户口」拆出去给了 basic.hukou——两者在中国人事表里是两个不同的格子
-      aliases: ['籍贯', '祖籍', '老家'],
+      aliases: ['籍贯', '祖籍', '老家', '家庭所在地', '家庭所在城市', '家庭常住地'],
       generic: ['hometown', 'nativeplace'],
       negative: ['户籍', '户口'],
       ac: [],
@@ -444,9 +452,18 @@
     // ───────────────────────────── 教育经历 ─────────────────────────────
     {
       key: 'educations.school', section: 'education', label: '学校',
-      aliases: ['学校名称', '毕业院校', '毕业学校', '就读学校', '学校', '院校', '学院'],
-      generic: ['school', 'university', 'college', 'institution', 'schoolname'],
-      negative: ['专业', '公司'],
+      aliases: ['学校名称', '毕业院校', '毕业学校', '就读学校', '学校', '院校'],
+      generic: ['school', 'university', 'institution', 'schoolname'],
+      // 「学校所在地」是城市，不是学校名；「学院」是院系，另有字段
+      negative: ['专业', '公司', '所在地', '地址', '邮编'],
+      ac: [],
+      types: ['text', 'select'],
+    },
+    {
+      key: 'educations.college', section: 'education', label: '学院',
+      aliases: ['所在学院', '学院名称', '院系名称', '所在院系', '学院', '院系', '系别'],
+      generic: ['college', 'academy', 'faculty', 'department', 'schoolcollege'],
+      negative: ['学校', '专业'],
       ac: [],
       types: ['text', 'select'],
     },
@@ -555,9 +572,10 @@
     },
     {
       key: 'educations.honors', section: 'education', label: '在校荣誉',
-      // 「荣誉奖项」「获奖情况」留给了 award 区块——那些是区块标题，不能同时当字段强别名
-      aliases: ['在校荣誉', '奖学金', '所获荣誉'],
-      generic: ['honors', 'scholarship'],
+      // 「荣誉奖项」也是一个常见的区块标题，但出现在教育经历的表单项标签上时
+      // 它就是字段本身（网易网申就是这样）。区块识别优先看标题层级，不冲突。
+      aliases: ['在校荣誉', '奖学金', '所获荣誉', '荣誉奖项'],
+      generic: ['honors', 'scholarship', 'honoraryaward'],
       negative: [],
       ac: [],
       types: ['textarea', 'text'],
@@ -583,6 +601,15 @@
       aliases: ['实验室', '课题组', '研究方向'],
       generic: ['lab', 'laboratory', 'researchgroup'],
       negative: [],
+      ac: [],
+      types: ['text'],
+    },
+    {
+      key: 'educations.mentor', section: 'education', label: '导师',
+      aliases: ['导师姓名', '指导教师', '指导老师', '导师'],
+      generic: ['mentor', 'advisor', 'supervisor', 'tutor'],
+      // 「导师姓名」里的「姓名」不能被 basic.name 抢走
+      negative: ['学校'],
       ac: [],
       types: ['text'],
     },

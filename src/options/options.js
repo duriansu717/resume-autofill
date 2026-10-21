@@ -163,6 +163,7 @@
 
     // 教育经历
     'educations.school': '学校全称，别写简称',
+    'educations.college': '所在学院 / 院系，如：计算机学院',
     'educations.schoolType': '如：985 / 211 / 双一流',
     'educations.major': '专业全称',
     'educations.majorCategory': '专业所属的大类',
@@ -175,6 +176,7 @@
     'educations.rank': '如 5 / 120，注明总人数',
     'educations.city': '学校所在城市',
     'educations.lab': '所属实验室，没有可留空',
+    'educations.mentor': '导师 / 指导教师姓名',
     'educations.courses': '列几门主修课程，用顿号隔开',
     'educations.honors': '在校获得的荣誉',
     'educations.thesisTitle': '毕业论文题目',
@@ -539,7 +541,7 @@
    * 两类分组行为不同：
    *   · 内置分组 —— 名字固定（不能让用户把「手机号码」改成别的，否则自己都对不上），
    *     只能在里面加/删内置字段
-   *   · 自定义分组 —— 名字和字段名都随便起，用来装内置 135 个字段覆盖不到的东西
+   *   · 自定义分组 —— 名字和字段名都随便起，用来装内置 137 个字段覆盖不到的东西
    */
   function renderEditGroup(group, index) {
     const sec = el('section', 'fsec');

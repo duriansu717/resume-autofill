@@ -209,7 +209,7 @@
 
     // 多行文本框只可能是描述类的
     if (d.kind === 'textarea') {
-      const isLong = /(description|selfEvaluation|skills|evaluation)/i.test(key);
+      const isLong = /(description|selfEvaluation|skills|evaluation|honors|courses)/i.test(key);
       return isLong ? 1.2 : 0.25;
     }
 

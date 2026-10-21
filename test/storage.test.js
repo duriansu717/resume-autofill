@@ -98,6 +98,37 @@ check('内置模板只有一份，叫「通用模板」且字段齐全', async (
   assert(def.groups.some((g) => g.fields.length > 0), '内置模板应该有字段');
 });
 
+check('老版本保存的内置模板会自动补齐新增字段', async () => {
+  clearStore();
+
+  // 模拟上一个版本保存的模板：还没有「学院」「导师」这两个字段
+  const oldTpl = S.buildDefaultTemplate();
+  const edu = oldTpl.groups.find((g) => g.sectionKey === 'education');
+  edu.fields = edu.fields.filter(
+    (f) => f.key !== 'educations.college' && f.key !== 'educations.mentor'
+  );
+
+  // 用户自建模板不应该被擅自改动
+  const custom = {
+    id: 'tpl_custom',
+    name: '自定义模板',
+    groups: [{ sectionKey: 'education', title: '教育经历', fields: [{ key: 'educations.school' }] }],
+  };
+
+  await S.setTemplates({ list: [oldTpl, custom] });
+
+  const got = await S.getTemplates();
+  const def = got.list.find((t) => t.id === S.DEFAULT_TEMPLATE_ID);
+  const keys = def.groups.find((g) => g.sectionKey === 'education').fields.map((f) => f.key);
+
+  assert(keys.includes('educations.college'), '「学院」没有补进内置模板');
+  assert(keys.includes('educations.mentor'), '「导师」没有补进内置模板');
+  assert(new Set(keys).size === keys.length, '补齐后出现了重复字段');
+
+  const c = got.list.find((t) => t.id === 'tpl_custom');
+  assert(c.groups[0].fields.length === 1, '自建模板不该被自动改结构');
+});
+
 check('默认有一份「通用简历」，使用内置模板', async () => {
   clearStore();
   const r = await S.getResumes();

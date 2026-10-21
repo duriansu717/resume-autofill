@@ -391,12 +391,15 @@
    */
   const OPTION_SEL = '[role="option"], .ant-select-item-option, .el-select-dropdown__item, ' +
     '.ivu-select-item, .ant-cascader-menu-item, .el-cascader-node, ' +
-    '.ant-picker-cell, .el-date-table td, li[class*="option"]';
+    '.ant-picker-cell, .el-date-table td, ' +
+    '.ant-calendar-date, .ant-calendar-month-panel-month, .ant-calendar-year-panel-year, ' +
+    'li[class*="option"]';
 
   /** 面板选择器。很多组件把弹层挂到 body 上，类名五花八门，能列的都列上 */
   const PANEL_SEL = [
     '[role="listbox"]', '[role="menu"]', '[role="tree"]',
     '.ant-select-dropdown', '.ant-picker-panel', '.ant-cascader-dropdown',
+    '.ant-calendar', '.ant-calendar-picker-container', '.ant-cascader-menus',
     '.el-select-dropdown', '.el-cascader-panel', '.el-autocomplete-suggestion',
     '.ivu-select-dropdown', '.ivu-picker-panel',
     '.arco-select-popup', '.arco-cascader-popup', '.arco-picker-container',
@@ -407,6 +410,7 @@
     '[class*="dropdown"]', '[class*="popup"]', '[class*="popper"]',
     '[class*="suggest"]', '[class*="autocomplete"]', '[class*="option-list"]',
     '[class*="options-panel"]', '[class*="select-panel"]', '[class*="picker-panel"]',
+    '[class*="calendar"]',
   ].join(', ');
 
   function isVisible(el) {
@@ -1237,6 +1241,21 @@
     if (d.kind === 'date-cluster') {
       return d.cluster.units.map((u) => u.el.value).join('-');
     }
+
+    // 自定义组件里真正有意义的显示值在容器上（AntD Select 的内层 input
+    // 是一个 0×0 的搜索框，选中后它仍然是空的）。直接读 d.el.value 会把
+    // 一次成功的填充误判成 value-reverted。
+    if (d.kind === 'text' || d.kind === 'textarea') {
+      let host = null;
+      try {
+        host = d.el.closest && d.el.closest(RA.scan.WIDGET_SEL);
+      } catch (e) { /* 忽略 */ }
+      if (host && host !== d.el) {
+        const shown = readDisplay(host);
+        if (shown) return shown;
+      }
+    }
+
     return d.el.value;
   }
 

@@ -37,6 +37,9 @@
     '.select2-container', '.chosen-container', '.selectize-control',
     // 小米网申用的 atsx 系列（Ant Design 同构命名）
     '.atsx-select', '.atsx-date-picker', '.atsx-calendar-picker', '.atsx-picker',
+    // Ant Design v3 的日期 / 级联选择器（网易等站点仍在使用）
+    '.ant-calendar-picker', '.ant-calendar', '.ant-cascader-picker',
+    '[class*="calendar"]',
     '[class*="date-picker"]', '[class*="picker-period"]',
     '[role="combobox"]', '[aria-haspopup="listbox"]', '[aria-haspopup="dialog"]',
     '[aria-autocomplete]', '[data-popper-placement]',
@@ -105,6 +108,10 @@
     if (!p) return false;
     const s = String(p).trim();
     if (/^(例|例如|示例|举例|如|e\.?g\.?|ex\.?|example|input|enter)\b/i.test(s)) return true;
+
+    // 日期/时间类提示是标签，不是「示例值」。
+    // 「入校时间」只有 4 个汉字，早先会被下面的纯汉字规则误判成示例值。
+    if (/(日期|时间|年份|年月|生日|出生|yyyy|mm-dd|yyyy-mm)/i.test(s)) return false;
     // 纯示例值：张三 / 13800138000 / abc@x.com / 2020-01-01
     if (/^1[3-9]\d{9}$/.test(s)) return true;
     if (/^[\w.+-]+@[\w.-]+\.\w+$/.test(s)) return true;

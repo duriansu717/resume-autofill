@@ -116,6 +116,7 @@
 
     educations: [{
       school: '',
+      college: '',
       schoolType: '',
       major: '',
       majorCategory: '',
@@ -128,6 +129,7 @@
       rank: '',
       city: '',
       lab: '',
+      mentor: '',
       courses: '',
       honors: '',
       thesisTitle: '',
@@ -428,6 +430,43 @@
     return { id: DEFAULT_TEMPLATE_ID, name: '通用模板', groups };
   }
 
+  /**
+   * 内置模板必须始终覆盖全部内置字段。
+   * 版本升级新增字段（例如学院、导师）时，已保存的模板不会自动多出这些格子，
+   * 这里按 key 补齐，保留用户已有的字段顺序、显示名和自定义字段。
+   * 只处理内置模板，用户自己建的模板不擅自改动。
+   */
+  function completeDefaultTemplate(tpl) {
+    if (!tpl || tpl.id !== DEFAULT_TEMPLATE_ID) return tpl;
+
+    const groups = (tpl.groups || []).map((g) => ({
+      ...g,
+      fields: Array.isArray(g.fields) ? g.fields.slice() : [],
+    }));
+
+    for (const sectionKey of Object.keys(RA.fields.KEYS_BY_SECTION || {})) {
+      const keys = RA.fields.KEYS_BY_SECTION[sectionKey] || [];
+      if (!keys.length) continue;
+
+      let group = groups.find((g) => g.sectionKey === sectionKey);
+      if (!group) {
+        group = {
+          sectionKey,
+          title: RA.fields.SECTION_LABEL[sectionKey] || sectionKey,
+          fields: [],
+        };
+        groups.push(group);
+      }
+
+      const have = new Set(group.fields.map((f) => f && f.key));
+      for (const key of keys) {
+        if (!have.has(key)) group.fields.push({ key });
+      }
+    }
+
+    return { ...tpl, groups };
+  }
+
   function defaultResume() {
     return { id: DEFAULT_RESUME_ID, name: '通用简历', templateId: DEFAULT_TEMPLATE_ID };
   }
@@ -503,7 +542,9 @@
     await ensureMigrated();
     const stored = await get(K_TEMPLATES, null);
     const list = (stored && Array.isArray(stored.list) ? stored.list : [])
-      .filter((t) => t && t.id && Array.isArray(t.groups));
+      .filter((t) => t && t.id && Array.isArray(t.groups))
+      // 老版本保存的内置模板缺新字段时，读取时补齐
+      .map((t) => completeDefaultTemplate(t));
 
     if (!list.some((t) => t.id === DEFAULT_TEMPLATE_ID)) {
       list.unshift(buildDefaultTemplate());
@@ -718,6 +759,7 @@
     K_RESUMES,
     TEMPLATE,
     buildDefaultTemplate,
+    completeDefaultTemplate,
     getTemplates,
     setTemplates,
     getResumes,

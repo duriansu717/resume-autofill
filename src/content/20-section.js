@@ -264,6 +264,76 @@
     };
   }
 
+  // ─────────────────────── 从 id / name 推断区块 ───────────────────────
+
+  /**
+   * 很多网申系统会把区块写进 id / name：
+   *   resume_education_form_time[0]
+   *   education[0].school
+   *   work_experience_1_company
+   * 标题识别不到时，这是最可靠的证据，还能顺带拿到「第几条经历」。
+   *
+   * 这里只认明确的区块词，不认 school / company 这种字段词——
+   * 否则 schoolEmail 这类基本信息的 id 会被误判成教育经历。
+   */
+  const SECTION_ID_PATTERNS = [
+    { key: 'internship', re: /(^|[^a-z])internships?([^a-z]|$)/ },
+    { key: 'studentCadre', re: /(^|[^a-z])studentcadre/ },
+    { key: 'itSkill', re: /(^|[^a-z])itskills?([^a-z]|$)/ },
+    { key: 'certificate', re: /(^|[^a-z])certificates?([^a-z]|$)/ },
+    { key: 'competition', re: /(^|[^a-z])(competitions?|contests?)([^a-z]|$)/ },
+    { key: 'training', re: /(^|[^a-z])trainings?([^a-z]|$)/ },
+    { key: 'language', re: /(^|[^a-z])languages?([^a-z]|$)/ },
+    { key: 'campus', re: /(^|[^a-z])campus([^a-z]|$)/ },
+    { key: 'project', re: /(^|[^a-z])projects?([^a-z]|$)/ },
+    { key: 'education', re: /(^|[^a-z])educations?([^a-z]|$)/ },
+    { key: 'work', re: /(^|[^a-z])(works?|workexperience)([^a-z]|$)/ },
+    { key: 'award', re: /(^|[^a-z])awards?([^a-z]|$)/ },
+  ];
+
+  function entryIndexFromId(s) {
+    let m = /\[(\d+)\]/.exec(s);
+    if (m) return +m[1];
+    m = /(?:^|[_\-\[])(\d+)(?:[_\-\]]|$)/.exec(s);
+    if (m) return +m[1];
+    return null;
+  }
+
+  /** 自己或最近的祖先上，有没有写着区块的 id / name */
+  function sectionFromId(el) {
+    const body = typeof document !== 'undefined' ? document.body : null;
+    let node = el;
+    for (let depth = 0; depth < 7 && node && node !== body; depth++, node = node.parentElement) {
+      let attrs = [];
+      try {
+        attrs = [
+          node.getAttribute('id'),
+          node.getAttribute('name'),
+          node.getAttribute('data-name'),
+          node.getAttribute('data-field'),
+        ];
+      } catch (e) { /* 忽略 */ }
+
+      for (const raw of attrs) {
+        if (!raw) continue;
+        const s = String(raw);
+        // camelCase 拆开，workForm 也能匹配 work
+        const norm = s.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+
+        let best = null;
+        for (const { key, re } of SECTION_ID_PATTERNS) {
+          const idx = norm.search(re);
+          if (idx < 0) continue;
+          // 同一个 id 里出现多个区块词时，以最先出现的为准（通常是前缀）
+          if (!best || idx < best.idx) best = { key, idx };
+        }
+
+        if (best) return { key: best.key, entryIndex: entryIndexFromId(s) };
+      }
+    }
+    return null;
+  }
+
   // ─────────────────────── 对整批字段做区块标注 ───────────────────────
 
   /**
@@ -336,6 +406,18 @@
       }
     }
 
+    // id / name 里写着区块时，以它为准补上（标题识别不到、容器投票也不明确时）。
+    // 这一步放在条目编号之后：id 里的 [0] / [1] 比「第几个相似容器」可靠得多。
+    for (const d of descriptors) {
+      if (d.section.key && (d.section.confidence || 0) >= 0.6) continue;
+      const inferred = sectionFromId(d.el);
+      if (!inferred) continue;
+
+      d.section.key = inferred.key;
+      d.section.confidence = 0.55;
+      if (inferred.entryIndex != null) d.section.entryIndex = inferred.entryIndex;
+    }
+
     // 拆分日期：把「被识别为日期组第一个控件」的描述符升级成 date-cluster，
     // 组里剩下的控件标记为已消费，不再单独参与匹配——否则年月日会被当成三个独立字段。
     for (const d of descriptors) {
@@ -368,6 +450,8 @@
     findAddButton,
     detectDateCluster,
     inferUnit,
+    sectionFromId,
+    entryIndexFromId,
     looksLikeFieldLabel,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
