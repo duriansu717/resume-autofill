@@ -29,6 +29,11 @@
     '结束', '终止', '至', 'to', 'end', 'enddate', 'todate', 'finish',
   ];
 
+  // 区间总标签：只对教育 / 工作生效，所以放在各自的 generic 里，
+  // 不放进全局别名表（那会被其它模块抢走）
+  const EDU_PERIOD_LABELS = ['在校时间', '就读时间', '学习时间', '教育时间'];
+  const WORK_PERIOD_LABELS = ['在职时间', '任职时间', '工作时间'];
+
   const DEFS = [
     // ───────────────────────────── 基本信息 ─────────────────────────────
     {
@@ -463,8 +468,10 @@
     },
     {
       key: 'educations.startDate', section: 'education', label: '入学时间',
+      // 「在校时间 / 就读时间」是一个区间的总标签，两个日期控件共用它；
+      // 起止两个字段都收，靠槽位互斥分开。
       aliases: ['入学时间', '入学日期', '入校时间', '就读起始时间', '开始就读'],
-      generic: DATE_START_GENERIC,
+      generic: DATE_START_GENERIC.concat(EDU_PERIOD_LABELS),
       negative: ['毕业', '离职', '入职'],
       ac: [],
       types: ['text', 'date', 'select'],
@@ -474,7 +481,7 @@
       // 「毕业年份」留给了基本信息里的 basic.graduateYear（那是问「你哪年毕业的」，
       // 不是问读研读博的结束月份），这里不重复声明
       aliases: ['毕业时间', '毕业日期', '离校时间', '预计毕业时间'],
-      generic: DATE_END_GENERIC,
+      generic: DATE_END_GENERIC.concat(EDU_PERIOD_LABELS),
       negative: ['入学', '入职', '离职'],
       ac: [],
       types: ['text', 'date', 'select'],
@@ -608,7 +615,7 @@
     {
       key: 'works.startDate', section: 'work', label: '入职时间',
       aliases: ['入职时间', '入职日期', '任职起始时间', '开始任职时间'],
-      generic: DATE_START_GENERIC,
+      generic: DATE_START_GENERIC.concat(WORK_PERIOD_LABELS),
       negative: ['入学', '毕业', '离职'],
       ac: [],
       types: ['text', 'date', 'select'],
@@ -616,7 +623,7 @@
     {
       key: 'works.endDate', section: 'work', label: '离职时间',
       aliases: ['离职时间', '离职日期', '任职结束时间', '结束任职时间'],
-      generic: DATE_END_GENERIC,
+      generic: DATE_END_GENERIC.concat(WORK_PERIOD_LABELS),
       negative: ['入学', '毕业', '入职'],
       ac: [],
       types: ['text', 'date', 'select'],

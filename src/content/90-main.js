@@ -338,7 +338,8 @@
 
     // 没被识别出来的控件用虚线标出来，引导用户手动指定
     unfilledEls = descriptors
-      .filter((d) => !d.consumed && !usedEls.has(d.el))
+      .filter((d) => !d.consumed && !usedEls.has(d.el) &&
+        !(d.signals && d.signals.hiddenInternal))
       .map((d) => d.el);
     stats.unfilled = unfilledEls.length;
     if (diag) diag.setUnfilled(unfilledEls);
@@ -450,7 +451,10 @@
     // 失败记录冲掉，否则「复制诊断」就只剩扫描结果了。
     if (RA.diag && typeof RA.diag.setScan === 'function') {
       RA.diag.setScan(descriptors, matches);
-      RA.diag.setUnfilled(descriptors.filter((d) => !matches.some((m) => m.d === d)).map((d) => d.el));
+      RA.diag.setUnfilled(descriptors
+        .filter((d) => !matches.some((m) => m.d === d) &&
+          !(d.signals && d.signals.hiddenInternal))
+        .map((d) => d.el));
     }
 
     return {

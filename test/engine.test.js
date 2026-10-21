@@ -306,6 +306,14 @@ check('学历下拉被识别为学历', () => {
   assertEq(topKeyName(d), 'educations.degree');
 });
 
+check('组件内部 0×0 的隐藏 input 不参与匹配', () => {
+  // atsx-date-picker-period-hidden-input 这类控件只负责存值，
+  // 真正可操作的是它旁边可见的选择器。让它参与匹配只会抢走槽位。
+  const d = mk({ hiddenInternal: true, labelText: '在校时间', labelSource: 'for' });
+  const r = RA.score.scoreField(d, ['educations.startDate', 'educations.endDate']);
+  assertEq(r.length, 0, '隐藏 input 不该产生任何候选');
+});
+
 check('没有区块标题时，靠旁边的学校 / 公司字段判定日期属于哪个模块', () => {
   // 表格布局：一行是教育（学校名称 + 开始/结束时间），一行是工作（公司名称 + …），
   // 全页没有「教育经历 / 工作经历」标题。日期字段只能靠同行的字段确定归属。

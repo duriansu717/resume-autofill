@@ -1025,6 +1025,39 @@ function fakeInput(attrs) {
   };
 }
 
+check('form-item-children 这类子元素不会被当成表单项容器', () => {
+  // atsx-form-item-children 也包含 "form-item" 字样。早先按 [class*="form-item"]
+  // 判断，会先命中子元素，导致真正的 atsx-form-item-label 永远读不到。
+  const node = (cls) => ({
+    className: cls,
+    matches: () => false,
+  });
+
+  for (const sub of [
+    'atsx-form-item-children',
+    'ant-form-item-control-wrapper',
+    'ant-form-item-control',
+    'el-form-item__label',
+    'el-form-item__content',
+    'form-item-label',
+  ]) {
+    if (RA.scan.isFormItemNode(node(sub))) throw new Error('不该把子元素当表单项：' + sub);
+  }
+
+  for (const item of [
+    'atsx-form-item',
+    'ant-form-item',
+    'el-form-item',
+    'ivu-form-item',
+    'form-item',
+    'formitem',
+    'van-field',
+    'form-group',
+  ]) {
+    if (!RA.scan.isFormItemNode(node(item))) throw new Error('应该认成表单项：' + item);
+  }
+});
+
 check('readonly 但带「请选择学校」提示的框不会被当成只读计算字段跳过', () => {
   // 学校/公司这类选择器经常没有约定类名，只有 readonly + 提示语。
   // 以前一律按 readonly 跳过，表现就是「这个字段根本检测不到」。

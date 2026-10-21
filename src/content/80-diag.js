@@ -242,6 +242,18 @@
     };
   }
 
+  /** 日期 / 选择器类字段：即使填成功了，也值得附一份 DOM，便于排查同类问题 */
+  function isDateLikeField(row) {
+    const s = row.signals || {};
+    const el = row.el || {};
+    const text = [
+      s.label, s.placeholder, s.id, s.class, s.name,
+      el.id, el.type, el.role,
+      row.matched && row.matched.key, row.attempt && row.attempt.key,
+    ].join(' ');
+    return /date|picker|calendar|yyyy|\bmm\b|年|月|日|日期|时间/i.test(text);
+  }
+
   let allKeysCache = null;
   function allKeys() {
     if (!allKeysCache) allKeysCache = (RA.fields.DEFS || []).map((x) => x.key);
@@ -343,8 +355,10 @@
           };
 
           const failed = a && !a.ok;
-          if (!m || failed) {
-            row.candidates = topCandidates(d);
+          const skipped = m && m.tier === 'skip';
+
+          if (!m || failed || skipped || isDateLikeField(row)) {
+            if (!m || failed) row.candidates = topCandidates(d);
             if (priority.length < MAX_DOM_FIELDS + 20) priority.push(row);
           }
         } catch (e) {

@@ -343,6 +343,10 @@
   // ─────────────────────────── 单个字段打分 ───────────────────────────
 
   function scoreField(d, keys) {
+    // 组件内部存值的隐藏 input：保留在报告里，但不参与匹配，
+    // 免得它抢走真正可见控件的槽位。
+    if (d && d.signals && d.signals.hiddenInternal) return [];
+
     const sources = signalSources(d);
     const results = [];
 

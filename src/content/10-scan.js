@@ -35,6 +35,9 @@
     '.arco-tree-select', '.arco-auto-complete', '.semi-select',
     '.n-select', '.n-base-selection', '.t-select', '.t-cascader', '.t-auto-complete',
     '.select2-container', '.chosen-container', '.selectize-control',
+    // 小米网申用的 atsx 系列（Ant Design 同构命名）
+    '.atsx-select', '.atsx-date-picker', '.atsx-calendar-picker', '.atsx-picker',
+    '[class*="date-picker"]', '[class*="picker-period"]',
     '[role="combobox"]', '[aria-haspopup="listbox"]', '[aria-haspopup="dialog"]',
     '[aria-autocomplete]', '[data-popper-placement]',
   ].join(',');
@@ -138,19 +141,47 @@
     return out.replace(/\s+/g, ' ').trim();
   }
 
-  const FORM_ITEM_SEL = [
-    '[class*="form-item"]', '[class*="formitem"]', '[class*="form-item"]',
-    '[class*="form-group"]', '[class*="formgroup"]', '[class*="field"]',
-    '[class*="ant-form-item"]', '[class*="el-form-item"]', '[class*="ivu-form-item"]',
-    'li', 'dd', 'td',
-  ].join(',');
+  /**
+   * 这个元素本身是不是「表单项容器」。
+   *
+   * 不能用 [class*="form-item"]：form-item-children / form-item-control /
+   * form-item__label 这些子部件全都包含这串字符，会被误判成表单项，
+   * 结果真正的 <label> 永远读不到（atsx-form-item-children 就是这种）。
+   * 这里按 class token 精确判断，并排除已知的子部件。
+   */
+  function isFormItemNode(node) {
+    if (!node || !node.matches) return false;
+    try {
+      if (node.matches('li, dd, td')) return true;
+
+      const raw = String(node.className && node.className.baseVal != null
+        ? node.className.baseVal : node.className || '');
+      if (!raw) return false;
+
+      // BEM 的下划线统一成连字符：el-form-item__label → el-form-item-label
+      const tokens = raw.replace(/_+/g, '-').toLowerCase().split(/\s+/);
+
+      const isItem = tokens.some((t) =>
+        t === 'form-item' || t === 'formitem' || t === 'form-group' || t === 'formgroup' || t === 'field' ||
+        t.endsWith('-form-item') || t.endsWith('-formitem') ||
+        t.endsWith('-form-group') || t.endsWith('-formgroup') ||
+        t.endsWith('-field'));
+      if (!isItem) return false;
+
+      const isSubPart = tokens.some((t) =>
+        /(^|-)(form-item|formitem|field)-(children|child|control|label|wrapper|wrap|content|explain|extra|error|validate)(-|$)/.test(t));
+      return !isSubPart;
+    } catch (e) {
+      return false;
+    }
+  }
 
   // 每个控件会被反复问「你的表单项容器是谁」（解析标签、取邻近文本、区块投票都要用）。
   // 每次都沿祖先链做 querySelectorAll 在大页面上开销可观，缓存一下。
   let containerCache = new WeakMap();
 
   /** 往上找最近的「表单项容器」——一个包含本控件、且不带其他控件的祖先 */
-  function formItemContainer(el, maxDepth = 6) {
+  function formItemContainer(el, maxDepth = 8) {
     const cached = containerCache.get(el);
     if (cached !== undefined) return cached;
 
@@ -159,9 +190,21 @@
     let found = null;
     for (let i = 0; i < maxDepth && node && node !== document.body; i++) {
       const controls = node.querySelectorAll('input:not([type=hidden]),select,textarea');
-      if (controls.length === 1) {
-        fallback = node;
-        if (node.matches && node.matches(FORM_ITEM_SEL)) { found = node; break; }
+
+      // 只含一个控件的最近祖先：既是标签来源，也是日期组检测的边界
+      if (controls.length === 1) fallback = node;
+
+      if (isFormItemNode(node)) {
+        // 日期区间、单选组这类表单项里有 2~3 个控件，不能因为「不止一个控件」
+        // 就跳过它——真正的「起止时间」标签往往挂在整行的 form-item 上。
+        // 只要它自己带 label，就认它。
+        const hasLabel = !!(node.querySelector(
+          '.ant-form-item-label, .el-form-item__label, .ivu-form-item-label, ' +
+          '.van-field__label, .atsx-form-item-label, ' +
+          '[class*="form-item-label"], [class*="form-item__label"], ' +
+          '[class*="form-label"], [class*="field-label"]'
+        ));
+        if (controls.length === 1 || hasLabel) { found = node; break; }
       }
       node = node.parentElement;
     }
@@ -177,7 +220,9 @@
     if (!itemEl) return null;
     const cands = itemEl.querySelectorAll(
       '.ant-form-item-label, .el-form-item__label, .ivu-form-item-label, ' +
-      '.van-field__label, [class*="form-item__label"], [class*="form-label"], [class*="field-label"]'
+      '.van-field__label, .atsx-form-item-label, ' +
+      '[class*="form-item-label"], [class*="form-item__label"], ' +
+      '[class*="form-label"], [class*="field-label"]'
     );
     for (const c of cands) {
       const t = ownText(c);
@@ -351,7 +396,9 @@
     }
   }
 
-  const PICKER_HINT_RE = /请选择|请选取|选择|搜索|请输入|select|search|picker|choose/i;
+  // 日期控件的占位符经常是「YYYY - MM」「YYYY-MM-DD」这种纯格式串，
+  // 也属于「点开才让选」的选择器，不能因为 readonly 就直接跳过。
+  const PICKER_HINT_RE = /请选择|请选取|选择|搜索|请输入|select|search|picker|choose|yyyy|yyyy-mm|mm-dd|年|月|日|日期|时间/i;
 
   /**
    * readonly 的框里，有一部分其实是「点一下才弹出面板」的选择器
@@ -388,6 +435,7 @@
         // 但自定义组件内层的隐藏 input 是正常的，别当成不可见跳过
         if (!inWidget(el)) return true;
       }
+
     }
 
     return false;
@@ -441,7 +489,20 @@
 
     const placeholder = el.getAttribute('placeholder') || '';
 
+    // 组件内部存值用的 0×0 input（atsx-date-picker-period-hidden-input 这类）。
+    // 不参与匹配（它旁边可见的选择器才是要填的），但要留在诊断报告里——
+    // 认不出来的日期控件，往往就是靠它的容器结构定位的。
+    let hiddenInternal = false;
+    try {
+      const rect = el.getBoundingClientRect();
+      if (!rect.width && !rect.height &&
+          /hidden/i.test(el.getAttribute('class') || '')) {
+        hiddenInternal = true;
+      }
+    } catch (e) { /* 忽略 */ }
+
     return {
+      hiddenInternal,
       autocomplete: (el.getAttribute('autocomplete') || '').toLowerCase().replace(/^section-/, ''),
       name: stripDynamicTokens(el.getAttribute('name') || ''),
       id: stripDynamicTokens(el.getAttribute('id') || ''),
@@ -551,6 +612,7 @@
     collectSignals,
     resolveLabel,
     formItemContainer,
+    isFormItemNode,
     ownText,
     stripDynamicTokens,
     isValueLikePlaceholder,

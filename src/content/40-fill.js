@@ -1186,6 +1186,36 @@
     return { ok: true, via: 'click-recipe', value: after };
   }
 
+  /**
+   * 日期区间 / 时间范围组件的根节点里通常有两个可见控件。
+   * 如果直接把整个根节点当 host，两个字段会抢同一个 input。
+   * 这里缩小到「只包住当前控件」的最近祖先。
+   */
+  function liveControlCount(node) {
+    let n = 0;
+    if (!node || !node.querySelectorAll) return n;
+    for (const c of node.querySelectorAll('input, select, textarea')) {
+      const type = (c.getAttribute('type') || '').toLowerCase();
+      if (type === 'hidden') continue;
+      const cls = String(c.className && c.className.baseVal != null ? c.className.baseVal : c.className || '');
+      if (/hidden/i.test(cls)) continue;
+      const r = c.getBoundingClientRect();
+      if (!r.width && !r.height) continue;
+      n++;
+    }
+    return n;
+  }
+
+  function narrowHost(el, host) {
+    if (!host || liveControlCount(host) <= 1) return host;
+    let node = el.parentElement;
+    while (node && node !== host && node !== document.body) {
+      if (liveControlCount(node) === 1) return node;
+      node = node.parentElement;
+    }
+    return host;
+  }
+
   /** 读自定义组件当前显示的文字 */
   function readDisplay(host) {
     if (!host) return '';
@@ -1356,7 +1386,9 @@
         (d.el.getBoundingClientRect().width === 0 && !!host);
 
       if (host || hiddenInput) {
-        const r = await customWidget(host || d.el.parentElement, variants, d.el, d);
+        // 日期区间组件根节点里有两个日期控件，先缩到当前控件自己的容器
+        const targetHost = host ? narrowHost(d.el, host) : d.el.parentElement;
+        const r = await customWidget(targetHost, variants, d.el, d);
 
         // 点不开面板不代表没救：控件本身就是可编辑的 input 时，
         // 直接把值打进去也能用（站点通常会在这时把候选列表拉出来）。
