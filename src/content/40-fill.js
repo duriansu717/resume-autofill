@@ -376,11 +376,12 @@
    * 只认 role=option / 常见的框架选项类名，并且把过长的文字排除掉
    * （菜单里经常混着整段说明文字）。
    */
+  const OPTION_SEL = '[role="option"], .ant-select-item-option, .el-select-dropdown__item, ' +
+    '.ivu-select-item, .ant-cascader-menu-item, .el-cascader-node, ' +
+    '.ant-picker-cell, .el-date-table td, li[class*="option"]';
+
   function clickOptionIn(scope, variants) {
-    const sel = '[role="option"], .ant-select-item-option, .el-select-dropdown__item, ' +
-      '.ivu-select-item, .ant-cascader-menu-item, .el-cascader-node, ' +
-      '.ant-picker-cell, .el-date-table td, li[class*="option"]';
-    const items = Array.from(scope.querySelectorAll(sel)).filter((it) => {
+    const items = Array.from(scope.querySelectorAll(OPTION_SEL)).filter((it) => {
       const t = (it.textContent || '').trim();
       return t && t.length <= 40;
     });
@@ -402,8 +403,35 @@
       }
     }
     if (!best || bestScore < 0.6) return null;
+
+    try { best.scrollIntoView({ block: 'nearest' }); } catch (e) { /* 忽略 */ }
+
+    // 不少组件把选中逻辑挂在 mousedown 上（为了抢在 blur 之前），
+    // 只派发 click 会被它们忽略。
+    try {
+      best.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      best.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    } catch (e) { /* 忽略 */ }
+
     best.click();
     return best;
+  }
+
+  /** 当前所有「看得见」的下拉面板 */
+  function visibleDropdowns() {
+    const sel = '[role="listbox"], [role="menu"], ' +
+      '.ant-select-dropdown:not(.ant-select-dropdown-hidden), ' +
+      '.el-select-dropdown, .ivu-select-dropdown, .ant-picker-panel, ' +
+      '.ant-cascader-dropdown, .el-cascader-panel, [class*="dropdown"]';
+
+    const out = [];
+    for (const p of document.querySelectorAll(sel)) {
+      const cs = getComputedStyle(p);
+      if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') continue;
+      if (!p.getClientRects().length) continue; // 没有尺寸的占位元素
+      out.push(p);
+    }
+    return out;
   }
 
   /** 让下拉/日期弹层弹出来 */
@@ -575,22 +603,27 @@
     }
 
     // 3) 通用：点开 → 等弹层
+    // 先记下点开之前已经开着的面板，等下优先挑「新出现」的那个。
+    // 页面上同时挂着好几个下拉时，取第一个会点错地方。
+    const beforePanels = visibleDropdowns();
     const trigger = openWidget(host);
+
     const panel = await waitFor(() => {
-      const p = document.querySelector(
-        '[role="listbox"], [role="menu"], .ant-select-dropdown:not(.ant-select-dropdown-hidden), ' +
-        '.el-select-dropdown, .ivu-select-dropdown, .ant-picker-panel, ' +
-        '.ant-cascader-dropdown, .el-cascader-panel, [class*="dropdown"]'
-      );
-      if (!p) return null;
-      const cs = getComputedStyle(p);
-      if (cs.display === 'none' || cs.visibility === 'hidden') return null;
-      return p;
+      const vis = visibleDropdowns();
+      if (!vis.length) return null;
+
+      for (let i = vis.length - 1; i >= 0; i--) {
+        if (beforePanels.indexOf(vis[i]) < 0) return vis[i];
+      }
+      return vis[vis.length - 1];
     }, 700);
 
     if (!panel) {
       return { ok: false, reason: 'panel-not-opened' };
     }
+
+    // 面板出现 ≠ 选项渲染完了——很多站点的选项是异步拉取的
+    await waitFor(() => panel.querySelector(OPTION_SEL) || null, 800);
 
     // 3.1) 省市区级联树：面板里是多列，按 省 → 市 → 区 逐列点
     const isCascader = /cascader/i.test(String(panel.className || '')) ||
@@ -612,6 +645,11 @@
     let clicked = clickOptionIn(panel, variants);
     if (!clicked) {
       clicked = await typeToFilter(host, panel, variants);
+    }
+    if (!clicked) {
+      // 列表可能刚加载完，再给一次机会
+      await sleep(250);
+      clicked = clickOptionIn(panel, variants);
     }
 
     await sleep(120);
