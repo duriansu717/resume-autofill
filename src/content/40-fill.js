@@ -385,6 +385,17 @@
       const t = (it.textContent || '').trim();
       return t && t.length <= 40;
     });
+
+    // 兜底：有些组件的选项没有任何 role / 约定类名，只是一串 div / li / span。
+    // 找「叶子节点」——文字在它这里结束，点击会冒泡到真正挂事件的父节点。
+    if (!items.length) {
+      for (const el of scope.querySelectorAll('div, li, span, td, a')) {
+        if (el.children.length) continue;
+        const t = (el.textContent || '').trim();
+        if (t && t.length <= 40) items.push(el);
+      }
+    }
+
     if (!items.length) return null;
 
     let best = null;
@@ -526,13 +537,44 @@
     return pick(panel) || pick(host);
   }
 
+  function optionTexts(panel) {
+    if (!panel) return [];
+    return Array.from(panel.querySelectorAll(OPTION_SEL))
+      .slice(0, 30)
+      .map((it) => (it.textContent || '').trim());
+  }
+
+  function sameTexts(a, b) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
+  /** 面板可能被组件重渲染成新节点，用之前重新确认一下 */
+  function livePanel(panel) {
+    if (panel && panel.isConnected) {
+      const cs = getComputedStyle(panel);
+      if (cs.display !== 'none' && cs.visibility !== 'hidden') return panel;
+    }
+    const vis = visibleDropdowns();
+    return vis.length ? vis[vis.length - 1] : panel;
+  }
+
   /**
    * 可搜索的下拉：列表是虚拟滚动的，不输入就找不到目标项。
    * 往搜索框里打关键字，等列表过滤之后再点。
+   *
+   * 两个细节：
+   *   · 输入之后组件可能把面板整个换成新节点，所以点之前重新取一次
+   *   · 列表完全没变化说明这个输入框不是搜索框，别再打了
+   *   · 失败时把输入框恢复原样，不能直接清空——有的组件里它就是显示值
    */
   async function typeToFilter(host, panel, variants) {
     const input = findTypeableInput(host, panel);
     if (!input) return false;
+
+    const original = input.value;
+    const beforeTexts = optionTexts(panel);
 
     for (const v of variants) {
       if (!v) continue;
@@ -544,10 +586,14 @@
       } catch (e) { /* 忽略 */ }
 
       await sleep(180);
-      if (clickOptionIn(panel, variants)) return true;
+
+      const fresh = livePanel(panel);
+      if (clickOptionIn(fresh, variants)) return true;
+
+      if (sameTexts(beforeTexts, optionTexts(fresh))) break;
     }
 
-    try { setNativeValue(input, ''); } catch (e) { /* 忽略 */ }
+    try { setNativeValue(input, original); } catch (e) { /* 忽略 */ }
     return false;
   }
 
