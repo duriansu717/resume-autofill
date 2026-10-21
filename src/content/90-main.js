@@ -315,7 +315,48 @@
 
     // 经历条目可能已经变了，重新做一次完整分析
     const descriptors = freshScan(document);
-    const matches = RA.score.match(descriptors);
+
+    // 匹配时带上「这个字段在简历里的值」，下拉选项里出现该值时可以直接反推字段
+    const valuesFor = (key, entryIndex) => {
+      const v = RA.fill.valueFor(profile, key, entryIndex);
+      if (v == null || String(v).trim() === '') return [];
+      return RA.fill.valueVariants(key, v);
+    };
+
+    let matches = RA.score.match(descriptors, { valuesFor });
+
+    // 标签太含糊的下拉：点开看一眼选项（不写入），
+    // 再用「选项里有没有简历里的值」重新匹配一次。
+    const probedDs = [];
+    try {
+      const matched = new Set(
+        matches.filter((m) => m.tier !== 'skip').map((m) => m.d)
+      );
+      const probes = descriptors
+        .filter((d) => !matched.has(d) && !(d.signals && d.signals.hiddenInternal))
+        .slice(0, 8);
+
+      for (const d of probes) {
+        // probeOptionTexts 对普通输入框会立刻返回空数组，不会真的点开
+        const texts = await RA.fill.probeOptionTexts(d);
+        if (texts.length) {
+          d.signals.optionTexts = texts;
+          probedDs.push(d);
+        }
+      }
+
+      if (probedDs.length) {
+        matches = RA.score.match(descriptors, { valuesFor });
+
+        // 探测后仍然没匹配上的，把留下的面板关掉；
+        // 匹配上的先留着，紧接着的写入可以直接复用
+        for (const d of probedDs) {
+          if (!matches.some((m) => m.d === d && m.tier !== 'skip')) {
+            RA.fill.closeProbedPanel(d);
+          }
+        }
+      }
+    } catch (e) { /* 探测失败不影响正常匹配 */ }
 
     if (diag) diag.setScan(descriptors, matches);
 
@@ -335,6 +376,11 @@
     }
 
     const { rows, stats, usedEls } = await fillMatches(matches, profile, settings);
+
+    // 探测时点开、最后没用上的面板统一关掉
+    for (const d of probedDs) {
+      try { RA.fill.closeProbedPanel(d); } catch (e) { /* 忽略 */ }
+    }
 
     // 没被识别出来的控件用虚线标出来，引导用户手动指定
     unfilledEls = descriptors

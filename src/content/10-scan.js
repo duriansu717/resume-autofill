@@ -496,6 +496,14 @@
 
     const placeholder = el.getAttribute('placeholder') || '';
 
+    // 原生 <select> 的选项也要收进来——枚举指纹和「按选项值反推字段」
+    // 都靠它。早先只有单选组收集了 optionTexts，原生下拉整个漏掉了。
+    const optionTexts = el.tagName === 'SELECT' && el.options
+      ? Array.from(el.options).slice(0, 60)
+        .map((o) => (o.textContent || '').trim())
+        .filter(Boolean)
+      : [];
+
     // 组件内部存值用的 0×0 input（atsx-date-picker-period-hidden-input 这类）。
     // 不参与匹配（它旁边可见的选择器才是要填的），但要留在诊断报告里——
     // 认不出来的日期控件，往往就是靠它的容器结构定位的。
@@ -524,6 +532,7 @@
       maxLength: el.maxLength > 0 ? el.maxLength : null,
       className: stripDynamicTokens(el.getAttribute('class') || ''),
       nearbyText: nearby,
+      optionTexts,
       ...extra,
     };
   }

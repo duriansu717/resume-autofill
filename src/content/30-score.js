@@ -43,6 +43,9 @@
     className: 30,
     optionTexts: 34,
     enumHint: 85,
+    // 下拉展开后，选项里直接出现了简历里的某个值。
+    // 这比标签更硬——「学历类型」这种歧义标签也救得回来。
+    optionValue: 88,
   };
 
   const LABEL_SOURCE_WEIGHT = {
@@ -248,6 +251,53 @@
     return 1;
   }
 
+  /**
+   * 「这个下拉的选项里，有没有简历里的某个值？」
+   *
+   * 标签写「学历类型」「攻读方式」时，语义本身可能不足以确定字段；
+   * 但选项里出现了简历里的「全日制」，那它大概率就是学习形式。
+   * 只接受高度一致的匹配（完全相等，或较长内容的互相包含），
+   * 太短的包含（「男」包含在「男性」里）不做数，避免乱认。
+   */
+  function optionValueStrength(d, def, ctx) {
+    if (!ctx || typeof ctx.valuesFor !== 'function') return 0;
+
+    const opts = (d.signals && d.signals.optionTexts) || [];
+    if (opts.length < 2 || opts.length > 60) return 0;
+
+    let values;
+    try {
+      values = ctx.valuesFor(def.key, (d.section && d.section.entryIndex) || 0);
+    } catch (e) {
+      return 0;
+    }
+    if (!Array.isArray(values) || !values.length) return 0;
+
+    let best = 0;
+    for (const v of values) {
+      const vn = N.text(v);
+      if (!vn) continue;
+
+      for (const o of opts) {
+        const on = N.text(o);
+        if (!on) continue;
+
+        let s = 0;
+        if (on === vn) {
+          s = 1;
+        } else if (on.includes(vn) || vn.includes(on)) {
+          // 一个字的互相包含太容易误伤（男 / 男性），至少两个字
+          if (Math.min(on.length, vn.length) < 2) continue;
+          s = 0.75 + 0.25 * (Math.min(on.length, vn.length) / Math.max(on.length, vn.length));
+        }
+
+        if (s > best) best = s;
+      }
+    }
+
+    return best;
+  }
+
   /** 全部可匹配的字段 key。只算一次，别在每次匹配时重新 map。 */
   const ALL_KEYS = F.DEFS.map((x) => x.key);
 
@@ -342,7 +392,7 @@
 
   // ─────────────────────────── 单个字段打分 ───────────────────────────
 
-  function scoreField(d, keys) {
+  function scoreField(d, keys, ctx) {
     // 组件内部存值的隐藏 input：保留在报告里，但不参与匹配，
     // 免得它抢走真正可见控件的槽位。
     if (d && d.signals && d.signals.hiddenInternal) return [];
@@ -363,6 +413,16 @@
       const hint = enumHintScore(d, key);
       if (hint > 0) contribs.push({ source: 'enum-hint', weight: W.enumHint, contrib: hint });
 
+      // 选项里出现了简历里的值：标签不认识也能把字段配对出来
+      const valueHint = optionValueStrength(d, def, ctx);
+      if (valueHint >= 0.8) {
+        contribs.push({
+          source: 'option-value',
+          weight: W.optionValue,
+          contrib: W.optionValue * valueHint,
+        });
+      }
+
       if (!contribs.length) continue;
 
       // 主导证据 + 佐证
@@ -377,11 +437,12 @@
 
       // 上下文模块：只在「自己的区块不明」时介入。
       // 「开始时间」旁边就是「学校名称」→ 它是教育经历的开始时间，
-      // 跟它在文档里排第几无关。
-      const ctx = d.contextSection;
-      if (ctx && (!d.section || !d.section.key || (d.section.confidence || 0) < 0.6)) {
+      // 跟它在文档里排第几无关。注意别用 ctx 当变量名——
+      // 它会遮住 scoreField 的第三个参数（匹配上下文）。
+      const contextKey = d.contextSection;
+      if (contextKey && (!d.section || !d.section.key || (d.section.confidence || 0) < 0.6)) {
         if (F.REPEATING_SECTIONS.includes(def.section)) {
-          raw *= def.section === ctx ? 1.2 : 0.35;
+          raw *= def.section === contextKey ? 1.2 : 0.35;
         }
       }
 
@@ -430,7 +491,7 @@
 
     for (const d of descriptors) {
       if (d.consumed) continue;
-      for (const cand of scoreField(d, keys)) {
+      for (const cand of scoreField(d, keys, opts)) {
         pairs.push({ d, key: cand.key, score: cand.score, evidence: cand.evidence });
       }
     }
@@ -469,6 +530,7 @@
     scoreField,
     annotateContext,
     sectionVoteOf,
+    optionValueStrength,
     signalSources,
     contribution,
     slotOf,

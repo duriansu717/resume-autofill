@@ -385,6 +385,35 @@ check('所在学院 / 导师 / 荣誉奖项有对应字段', () => {
   assertEq(topKeyName(mk({ kind: 'textarea', labelText: '荣誉奖项', labelSource: 'for' })), 'educations.honors');
 });
 
+check('标签不认识时，用下拉选项里的简历值反推字段', () => {
+  // 标签只写「选项一」，但选项里出现了简历里的学校名。
+  // 这比标签更硬：展开下拉、看到自己的数据，就能确定这是哪个字段。
+  const d = mk({
+    kind: 'select',
+    labelText: '选项一',
+    labelSource: 'for',
+    optionTexts: ['东南大学', '北京大学', '清华大学'],
+  });
+  const opts = {
+    valuesFor: (key) => (key === 'educations.school' ? ['东南大学'] : []),
+  };
+
+  const matches = RA.score.match([d], opts);
+  assertEq(matches[0] && matches[0].key, 'educations.school', '应该按选项值反推');
+});
+
+check('一个字的值不做模糊包含，避免「男」命中「男性」误伤', () => {
+  const d = mk({ kind: 'select', labelText: '选项二', optionTexts: ['男性', '女性'] });
+  const opts = {
+    valuesFor: (key) => (key === 'basic.gender' || key === 'educations.isFullTime' ? ['男'] : []),
+  };
+  const r = RA.score.scoreField(d, ['basic.gender'], opts);
+  const sources = (r[0] && r[0].evidence ? r[0].evidence : []).map((e) => e.source);
+  if (sources.includes('option-value')) {
+    throw new Error('一个字的包含不该产生 option-value 证据');
+  }
+});
+
 check('组件内部 0×0 的隐藏 input 不参与匹配', () => {
   // atsx-date-picker-period-hidden-input 这类控件只负责存值，
   // 真正可操作的是它旁边可见的选择器。让它参与匹配只会抢走槽位。

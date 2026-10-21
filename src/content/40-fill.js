@@ -1039,6 +1039,72 @@
   }
 
   /**
+   * 只点开控件、把选项文字读出来，不写入。
+   *
+   * 用途：标签写得太含糊（「选项一」「攻读方式」），但下拉展开后
+   * 选项里可能正好有简历里的值。拿到选项后交给匹配引擎按值反推字段。
+   * 日期控件不探——它会打开一整张日历，既慢又容易误判。
+   */
+  async function probeOptionTexts(d, timeout = 600) {
+    const el = d && d.el;
+    if (!el) return [];
+
+    let host = null;
+    try {
+      host = el.closest && el.closest(RA.scan.WIDGET_SEL);
+    } catch (e) { /* 忽略 */ }
+    if (!host) return [];
+
+    if (d.signals && d.signals.optionTexts && d.signals.optionTexts.length) return [];
+    if (isDateKey(d.raKey)) return [];
+
+    const cls = String(host.className && host.className.baseVal != null
+      ? host.className.baseVal : host.className || '');
+    const elCls = String(el.className && el.className.baseVal != null
+      ? el.className.baseVal : el.className || '');
+    const hint = cls + ' ' + elCls + ' ' +
+      (el.getAttribute('placeholder') || '') + ' ' + (el.getAttribute('aria-label') || '');
+    if (/date|calendar|picker|yyyy|年|月|日|时间/i.test(hint)) return [];
+
+    const before = visibleDropdowns();
+    const watch = startPanelWatch();
+    let trigger = null;
+
+    try {
+      trigger = openWidget(host);
+      const panel = await waitForPanel(watch, before, timeout);
+      if (!panel) {
+        if (trigger) closePanel(trigger);
+        return [];
+      }
+
+      await waitFor(() => hasOptions(panel), 300);
+
+      // 面板先留着，紧接着的写入可以直接复用——有些组件按 Esc 关不掉，
+      // 再点一次反而会把它切成「已关闭」，导致真正写入时找不到面板。
+      d._probePanel = panel;
+      d._probeTrigger = trigger;
+
+      const texts = optionTexts(panel);
+      return Array.from(new Set(texts)).slice(0, 40);
+    } catch (e) {
+      if (trigger) closePanel(trigger);
+      return [];
+    } finally {
+      watch.stop();
+    }
+  }
+
+  /** 探测完没匹配上：把留下来的面板关掉，别挡着用户 */
+  function closeProbedPanel(d) {
+    if (!d) return;
+    const trigger = d._probeTrigger;
+    d._probePanel = null;
+    d._probeTrigger = null;
+    if (trigger) closePanel(trigger);
+  }
+
+  /**
    * 自定义组件填充。识别不出就放弃并如实报告——
    * 卡住整个流程比填不上一个字段糟糕得多。
    *
@@ -1088,11 +1154,18 @@
 
     let trigger = null;
     let panel = null;
+    const cachedPanel = ctx && ctx._probePanel;
+    const cachedTrigger = ctx && ctx._probeTrigger;
+
     try {
       // 打字时已经弹出来的日期面板直接用，再点一次会把它收起来
       if (openedByTyping.length) {
         panel = pickPanel(openedByTyping);
         trigger = dateInput || host;
+      } else if (cachedPanel && cachedPanel.isConnected && isVisible(cachedPanel)) {
+        // 预探测时点开的面板还在：直接复用，不要再点一次
+        panel = cachedPanel;
+        trigger = cachedTrigger && cachedTrigger.isConnected ? cachedTrigger : host;
       } else {
         trigger = openWidget(host);
         panel = await waitForPanel(watch, beforePanels, 700);
@@ -1550,6 +1623,8 @@
     fillChoiceGroup,
     fillDateCluster,
     customWidget,
+    probeOptionTexts,
+    closeProbedPanel,
     writeOne,
     valueFor,
     valueVariants,
