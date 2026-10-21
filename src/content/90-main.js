@@ -259,6 +259,16 @@
         res = { ok: false, reason: 'exception: ' + (e && e.message) };
       }
 
+      // 诊断报告要看到「每个字段试了什么、为什么失败」，比结果面板多一层细节
+      try {
+        if (RA.diag) {
+          RA.diag.recordAttempt({
+            d, key: m.key, label, tier: m.tier, score: m.score, raw, variants,
+            ok: res.ok, reason: res.reason, via: res.via, actual: res.actual,
+          });
+        }
+      } catch (e) { /* 诊断失败不能影响填充 */ }
+
       if (res.ok) {
         if (m.tier === 'high') stats.high++;
         else stats.low++;
@@ -294,8 +304,11 @@
     const profile = await RA.storage.getProfile();
     if (!profile) return { ok: false, reason: 'no-profile', found: 0 };
 
+    const diag = RA.diag && typeof RA.diag.begin === 'function' ? RA.diag : null;
+
     RA.overlay.clearMarks();
     resetSession();
+    if (diag) diag.begin();
 
     const entryInfo = await ensureEntries(profile, settings);
 
@@ -303,9 +316,22 @@
     const descriptors = freshScan(document);
     const matches = RA.score.match(descriptors);
 
+    if (diag) diag.setScan(descriptors, matches);
+
     if (settings.debug) dumpDebug(descriptors, matches);
 
-    if (!matches.length) return { ok: false, reason: 'no-fields', found: 0 };
+    if (!matches.length) {
+      // 一个都没匹配上时也要给结果面板：诊断按钮是这种情况唯一的排查入口。
+      // 但只在「像简历页」的 frame 里弹——否则页面上的广告 iframe 也会各弹一个。
+      if (diag) diag.setUnfilled(descriptors.map((d) => d.el));
+      let showPanel = false;
+      try { showPanel = looksLikeResumePage(); } catch (e) { showPanel = false; }
+      if (showPanel) {
+        RA.overlay.showPanel([], { high: 0, low: 0, fail: 0, unfilled: descriptors.length },
+          '没找到可填字段');
+      }
+      return { ok: false, reason: 'no-fields', found: 0 };
+    }
 
     const { rows, stats, usedEls } = await fillMatches(matches, profile, settings);
 
@@ -314,6 +340,7 @@
       .filter((d) => !d.consumed && !usedEls.has(d.el))
       .map((d) => d.el);
     stats.unfilled = unfilledEls.length;
+    if (diag) diag.setUnfilled(unfilledEls);
     RA.overlay.markUnfilled(unfilledEls);
 
     if (entryInfo.limited) {
@@ -384,6 +411,15 @@
       res = { ok: false, reason: 'exception: ' + (e && e.message) };
     }
 
+    try {
+      if (RA.diag) {
+        RA.diag.recordAttempt({
+          d, key, label, tier: 'manual', score: null, raw, variants,
+          ok: res.ok, reason: res.reason, via: res.via, actual: res.actual, manual: true,
+        });
+      }
+    } catch (e) { /* 诊断失败不能影响填充 */ }
+
     if (res.ok) {
       RA.overlay.markField(node, 'high');
       if (!quiet) {
@@ -406,6 +442,15 @@
     const descriptors = RA.scan.collectFields(document);
     RA.section.annotate(descriptors);
     const matches = RA.score.match(descriptors);
+
+    // 预览也是一次完整的「扩展怎么看这个页面」，同样值得能复制出来。
+    // 注意不要 begin()：popup 每次打开都可能触发扫描，不能把上一轮填写的
+    // 失败记录冲掉，否则「复制诊断」就只剩扫描结果了。
+    if (RA.diag && typeof RA.diag.setScan === 'function') {
+      RA.diag.setScan(descriptors, matches);
+      RA.diag.setUnfilled(descriptors.filter((d) => !matches.some((m) => m.d === d)).map((d) => d.el));
+    }
+
     return {
       ok: true,
       found: matches.length,

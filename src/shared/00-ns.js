@@ -25,6 +25,7 @@
   RA.overlay = RA.overlay || {};
   RA.pick = RA.pick || {};
   RA.datapanel = RA.datapanel || {};
+  RA.diag = RA.diag || {};
 
   /** 调试开关：在选项页里可以打开，打开后往 console 打候选信号表和映射表 */
   RA.debug = false;

@@ -172,7 +172,7 @@ const EXPECTED = {
     'deriveFromIdCard', 'deriveAge', 'resolveTheme', 'applyThemeToDocument',
     'buildDefaultTemplate', 'getTemplates', 'setTemplates',
     'TEMPLATE', 'DEFAULT_SETTINGS'],
-  scan: ['collectFields', 'collectSignals', 'resolveLabel', 'formItemContainer', 'ownText', 'stripDynamicTokens', 'isValueLikePlaceholder', 'shouldSkip', 'kindOf'],
+  scan: ['collectFields', 'collectSignals', 'resolveLabel', 'formItemContainer', 'ownText', 'stripDynamicTokens', 'isValueLikePlaceholder', 'shouldSkip', 'kindOf', 'looksLikePicker', 'isJunk', 'labelLooksLikeField'],
   section: ['annotate', 'findSectionTitle', 'classifySectionKind', 'findEntryContainer', 'findAddButton', 'detectDateCluster', 'inferUnit', 'looksLikeFieldLabel'],
   score: ['match', 'scoreField', 'signalSources', 'contribution', 'slotOf'],
   fill: ['setNativeValue', 'setNativeChecked', 'triggerBlur', 'selectByText', 'fillChoiceGroup',
@@ -183,6 +183,7 @@ const EXPECTED = {
   pick: ['start', 'stop', 'isActive', 'resolveTarget', 'isFromOverlay'],
   datapanel: ['toggle', 'open', 'close', 'isOpen', 'refresh',
     'buildGroups', 'copyToClipboard', 'setTarget', 'clearTarget', 'startPicking', 'getTarget'],
+  diag: ['begin', 'setScan', 'setUnfilled', 'recordAttempt', 'build', 'format', 'copy'],
   main: ['freshScan', 'doFill', 'doScanOnly', 'ensureEntries', 'fillField'],
 };
 
@@ -1057,6 +1058,82 @@ check('学校 / 公司 / 专业被识别为可能有联想列表的字段', () =
   if (!RA.fill.mayAutocomplete(mk('basic.city', { placeholder: '请输入学校名称' }))) {
     throw new Error('提示语指向学校时应该识别');
   }
+});
+
+// ─────────── 诊断报告 ───────────
+
+console.log('\n\x1b[1m诊断报告\x1b[0m');
+
+function diagEl(attrs) {
+  return {
+    tagName: 'INPUT',
+    getAttribute(k) {
+      return Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null;
+    },
+    getClientRects() { return [{}]; },
+    getBoundingClientRect() { return { left: 1, top: 2, width: 200, height: 32 }; },
+    matches() { return false; },
+    closest() { return null; },
+    getRootNode() { return globalThis.document; },
+  };
+}
+
+function diagDescriptor(el, extra) {
+  return Object.assign({
+    el,
+    els: [el],
+    kind: 'text',
+    domIndex: 0,
+    signals: {
+      labelText: '学校名称', labelSource: 'for', placeholder: '搜索学校名称',
+      name: 'schoolName', id: '', inputType: 'text', className: '', nearbyText: [],
+    },
+    section: { key: 'education', title: '教育经历', entryIndex: 0, confidence: 0.9 },
+  }, extra || {});
+}
+
+check('失败字段的诊断里带 DOM 快照、失败原因和候选分数', () => {
+  RA.diag.begin();
+  const el = diagEl({ name: 'schoolName', placeholder: '搜索学校名称' });
+  const d = diagDescriptor(el);
+  const m = { d, key: 'educations.school', score: 0.9, tier: 'high' };
+  RA.diag.setScan([d], [m]);
+  RA.diag.setUnfilled([el]);
+  RA.diag.recordAttempt({
+    d, key: 'educations.school', label: '学校', tier: 'high', score: 0.9,
+    raw: '清华大学', variants: ['清华大学'], ok: false,
+    reason: 'option-not-found', via: 'custom', actual: '',
+  });
+
+  const r = RA.diag.build();
+  if (r._type !== 'resume-assistant-diag') throw new Error('报告类型不对');
+  if (r.summary.failed !== 1) throw new Error('失败数不对：' + r.summary.failed);
+  const f = r.fields[0];
+  if (!f.dom) throw new Error('失败字段应该带 DOM 快照');
+  if (f.attempt.reason !== 'option-not-found') throw new Error('失败原因丢了');
+  if (!f.matched || f.matched.key !== 'educations.school') throw new Error('匹配信息丢了');
+  if (!Array.isArray(f.candidates) || !f.candidates.length) throw new Error('缺候选分数');
+});
+
+check('诊断报告隐藏手机号等敏感值', () => {
+  RA.diag.begin();
+  const el = diagEl({ name: 'phone' });
+  const d = diagDescriptor(el, {
+    signals: {
+      labelText: '手机号', labelSource: 'for', placeholder: '请输入手机号',
+      name: 'phone', id: '', inputType: 'tel', className: '', nearbyText: [],
+    },
+  });
+  RA.diag.setScan([d], []);
+  RA.diag.recordAttempt({
+    d, key: 'basic.phone', label: '手机号', tier: 'high', score: 0.9,
+    raw: '13800138000', variants: ['13800138000'], ok: false, reason: 'x',
+  });
+
+  const r = RA.diag.build();
+  const a = r.attempts[0];
+  if (a.value !== '（已隐藏）') throw new Error('手机号没有被隐藏：' + a.value);
+  if (a.variants.length) throw new Error('手机号的候选写法也应该隐藏');
 });
 
 // ─────────── 悬浮按钮的出现条件 ───────────

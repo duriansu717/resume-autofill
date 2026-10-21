@@ -59,6 +59,7 @@
         "src/content/50-overlay.js",
         "src/content/60-pick.js",
         "src/content/70-datapanel.js",
+        "src/content/80-diag.js",
         "src/content/90-main.js"
       ],
       "all_frames": true,

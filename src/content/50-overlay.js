@@ -1392,6 +1392,33 @@
     const panelBtn = el('button', 'act', '打开数据面板');
     panelBtn.title = '剩下的空框可以用数据面板一个个点';
     panelBtn.addEventListener('click', () => RA.datapanel.open());
+
+    // 遇到填不上的字段时，一键把现场信息复制出来发给开发者排查。
+    // 里面包含扫描信号、匹配分数、失败原因和失败控件的 DOM（已隐藏个人隐私）。
+    let diagBtn = null;
+    if (RA.diag && typeof RA.diag.copy === 'function') {
+      diagBtn = el('button', 'act', '复制诊断');
+      diagBtn.title = '复制这次识别与填充的现场信息（不含手机号、身份证等隐私）';
+      diagBtn.addEventListener('click', async () => {
+        diagBtn.disabled = true;
+        let r;
+        try {
+          r = await RA.diag.copy();
+        } catch (e) {
+          r = { ok: false, kb: 0 };
+        }
+        diagBtn.disabled = false;
+        if (r && r.ok) {
+          diagBtn.textContent = '已复制';
+          showToast(`诊断信息已复制（约 ${r.kb} KB），直接粘贴给开发者即可`);
+        } else {
+          diagBtn.textContent = '复制失败';
+          showToast('复制失败：请先点一下页面空白处，再试一次');
+        }
+        setTimeout(() => { diagBtn.textContent = '复制诊断'; }, 1800);
+      });
+    }
+
     const undo = el('button', 'act danger', '全部撤销');
     undo.addEventListener('click', () => {
       const n = RA.fill.undoAll();
@@ -1405,6 +1432,7 @@
     done.addEventListener('click', () => teardown());
 
     footer.appendChild(panelBtn);
+    if (diagBtn) footer.appendChild(diagBtn);
     footer.appendChild(undo);
     footer.appendChild(done);
     wrap.appendChild(footer);
