@@ -306,6 +306,62 @@ check('学历下拉被识别为学历', () => {
   assertEq(topKeyName(d), 'educations.degree');
 });
 
+check('没有区块标题时，靠旁边的学校 / 公司字段判定日期属于哪个模块', () => {
+  // 表格布局：一行是教育（学校名称 + 开始/结束时间），一行是工作（公司名称 + …），
+  // 全页没有「教育经历 / 工作经历」标题。日期字段只能靠同行的字段确定归属。
+  const root = { parentElement: null, children: [] };
+  const makeNode = (parent) => {
+    const n = {
+      parentElement: parent,
+      children: [],
+      contains(x) {
+        let p = x;
+        while (p) { if (p === n) return true; p = p.parentElement; }
+        return false;
+      },
+    };
+    if (parent) parent.children.push(n);
+    return n;
+  };
+
+  const row1 = makeNode(root);
+  const row2 = makeNode(root);
+  const td = (row) => makeNode(row);
+  const inputIn = (cell) => ({ parentElement: cell });
+
+  const eduRow = {
+    school: inputIn(td(row1)),
+    start: inputIn(td(row1)),
+    end: inputIn(td(row1)),
+  };
+  const workRow = {
+    company: inputIn(td(row2)),
+    start: inputIn(td(row2)),
+    end: inputIn(td(row2)),
+  };
+
+  const mkCell = (signals, el) => {
+    const d = mk(Object.assign({ labelSource: 'cell' }, signals));
+    d.el = el;
+    return d;
+  };
+
+  const school = mkCell({ labelText: '学校名称' }, eduRow.school);
+  const eduStart = mkCell({ labelText: '开始时间' }, eduRow.start);
+  const eduEnd = mkCell({ labelText: '结束时间' }, eduRow.end);
+  const company = mkCell({ labelText: '公司名称' }, workRow.company);
+  const workStart = mkCell({ labelText: '开始时间' }, workRow.start);
+  const workEnd = mkCell({ labelText: '结束时间' }, workRow.end);
+
+  const matches = RA.score.match([school, eduStart, eduEnd, company, workStart, workEnd]);
+  const byEl = new Map(matches.map((m) => [m.d, m.key]));
+
+  assertEq(byEl.get(eduStart), 'educations.startDate', '教育行的开始时间');
+  assertEq(byEl.get(eduEnd), 'educations.endDate', '教育行的结束时间');
+  assertEq(byEl.get(workStart), 'works.startDate', '工作行的开始时间');
+  assertEq(byEl.get(workEnd), 'works.endDate', '工作行的结束时间');
+});
+
 check('同一个「起止时间」标签下的两个日期控件，分别归到入学 / 毕业时间', () => {
   // 网申常见布局：一个表单项里放两个日期控件，标签只写「起止时间」。
   // 两个控件的标签完全一样，只能靠「一个槽位只能占一次」的全局分配来区分。

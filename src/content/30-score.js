@@ -251,6 +251,95 @@
   /** 全部可匹配的字段 key。只算一次，别在每次匹配时重新 map。 */
   const ALL_KEYS = F.DEFS.map((x) => x.key);
 
+  // ─────────────────────────── 上下文模块推断 ───────────────────────────
+
+  /** 日期类字段，用来排除「自己给自己投票」 */
+  const DATE_KEY_RE = /(birthday|startDate|endDate|date|graduateYear|availableFrom)$/;
+
+  /**
+   * 一个控件旁边的字段，能不能明确说出「我们在哪个模块」？
+   * 只看强别名（学校名称 / 公司名称 / 项目名称…），不看「开始时间」这类跨模块通用的词。
+   */
+  function sectionVoteOf(d) {
+    const s = d.signals || {};
+    const text = [s.labelText, s.placeholder, s.name, s.id, s.ariaLabel].filter(Boolean).join(' ');
+    const norm = N.text(text);
+    if (!norm) return null;
+    const spaced = N.spaced(text);
+
+    let best = null;
+    for (const def of F.DEFS) {
+      if (!F.REPEATING_SECTIONS.includes(def.section)) continue;
+      if (DATE_KEY_RE.test(def.key)) continue;
+
+      const m = N.bestMatch(def.aliases, norm, spaced);
+      if (!m) continue;
+
+      // 单元格 / 容器文本比 aria-label 弱一点，但仍然是有效证据
+      const source = s.labelSource || '';
+      const weight = source === 'cell' || source === 'container' ? 0.85 : 1;
+      const score = m.strength * weight;
+
+      if (!best || score > best.score) best = { section: def.section, score };
+    }
+
+    return best && best.score >= 0.75 ? best : null;
+  }
+
+  /**
+   * 给「区块不明 / 低置信」的控件补一个上下文模块。
+   *
+   * 场景：页面上有两行经历，只写「开始时间 / 结束时间」，没有区块标题，
+   * 或者标题识别失败。这时日期字段自己分不清教育还是工作，但它旁边的
+   * 「学校名称」「公司名称」是有明确归属的——用它们投票。
+   *
+   * 顺序只在同一模块、同一组完全同名的「起止时间」之间作为最后兜底，
+   * 不再承担「跨模块区分」的职责。
+   */
+  function annotateContext(descriptors) {
+    if (!descriptors || descriptors.length < 2) return;
+
+    for (const d of descriptors) delete d.contextSection;
+
+    const ambiguous = descriptors.filter((d) =>
+      !d.section || !d.section.key || (d.section.confidence || 0) < 0.6);
+
+    for (const d of ambiguous) {
+      if (!d.el || !d.el.parentElement) continue;
+
+      // 从最近到最远找一个「至少包含另一个字段」的祖先。
+      // 先找到的是行 / 表单项组，能避免跨模块串味。
+      const body = typeof document !== 'undefined' ? document.body : null;
+      let node = d.el.parentElement;
+      let members = null;
+      for (let depth = 0; depth < 8 && node && node !== body; depth++, node = node.parentElement) {
+        const list = descriptors.filter((x) => x !== d && !x.consumed && node.contains(x.el));
+        if (!list.length) continue;
+        if (list.length > 12) break; // 已经跨到很大的容器了，不猜
+        members = list;
+        break;
+      }
+      if (!members) continue;
+
+      const votes = {};
+      for (const s of members) {
+        const v = sectionVoteOf(s);
+        if (v) votes[v.section] = (votes[v.section] || 0) + v.score;
+      }
+
+      const ranked = Object.entries(votes).sort((a, b) => b[1] - a[1]);
+      if (!ranked.length) continue;
+
+      const [winner, score] = ranked[0];
+      const second = ranked[1] ? ranked[1][1] : 0;
+      // 票数太少或两个模块咬得太紧，都不下结论
+      if (score < 0.75) continue;
+      if (second && score < second * 1.5) continue;
+
+      d.contextSection = winner;
+    }
+  }
+
   // ─────────────────────────── 单个字段打分 ───────────────────────────
 
   function scoreField(d, keys) {
@@ -281,6 +370,16 @@
       raw *= typeGate(d, def);
       raw *= lengthBoost(d, def);
       raw *= sectionGate(d, def);
+
+      // 上下文模块：只在「自己的区块不明」时介入。
+      // 「开始时间」旁边就是「学校名称」→ 它是教育经历的开始时间，
+      // 跟它在文档里排第几无关。
+      const ctx = d.contextSection;
+      if (ctx && (!d.section || !d.section.key || (d.section.confidence || 0) < 0.6)) {
+        if (F.REPEATING_SECTIONS.includes(def.section)) {
+          raw *= def.section === ctx ? 1.2 : 0.35;
+        }
+      }
 
       let score = Math.max(0, Math.min(1, raw / 100));
 
@@ -319,6 +418,9 @@
    * @returns {Array<{descriptor, key, score, evidence, tier}>}
    */
   function match(descriptors, opts = {}) {
+    // 先给区块不明的字段补上下文（靠旁边的学校 / 公司 / 项目字段投票）
+    annotateContext(descriptors);
+
     const keys = ALL_KEYS;
     const pairs = [];
 
@@ -361,6 +463,8 @@
   RA.score = {
     match,
     scoreField,
+    annotateContext,
+    sectionVoteOf,
     signalSources,
     contribution,
     slotOf,
