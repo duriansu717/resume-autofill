@@ -688,13 +688,30 @@
     return /(^|\.)(birthday|startDate|endDate|date)$/.test(key);
   }
 
-  /** 显示值里有没有这个年月（兼容 2021-07 / 2021年7月 / 2021/07/01 等写法） */
+  /**
+   * 显示值里是不是这个日期（兼容 2021-07 / 2021年7月 / 2021/07/01 等写法）。
+   * 目标带「日」时，显示值也必须带正确的「日」——否则 2021年07月 会被
+   * 误认为 2021-07-15 已经填成功。
+   */
   function dateShown(shown, iso) {
-    if (!shown) return false;
-    const y = iso.slice(0, 4);
-    const m = iso.slice(5, 7);
-    if (!shown.includes(y)) return false;
-    return shown.includes(m) || shown.includes(String(Number(m)));
+    if (!shown || !iso) return false;
+
+    const target = /^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?/.exec(iso);
+    if (!target) return false;
+
+    const y = +target[1];
+    const mo = +target[2];
+    const day = target[3] ? +target[3] : null;
+
+    const m = /(\d{4})\D+(\d{1,2})(?:\D+(\d{1,2}))?/.exec(shown);
+    if (!m) return false;
+    if (+m[1] !== y || +m[2] !== mo) return false;
+
+    if (day != null) {
+      if (m[3] == null) return false;
+      if (+m[3] !== day) return false;
+    }
+    return true;
   }
 
   function closePanel(trigger) {
@@ -961,6 +978,120 @@
     return null;
   }
 
+  /** 标题栏上的「当前月份」——点它一般会展开月份表格 */
+  function headerMonthCell(scope) {
+    if (!scope) return null;
+    for (const el of scope.querySelectorAll('div, span, button, a, td')) {
+      if (!isVisible(el)) continue;
+      if (el.children.length) continue;
+
+      const cls = String(el.className && el.className.baseVal != null
+        ? el.className.baseVal : el.className || '');
+      if (!/header|month-select|month-btn|picker-month|month-label/i.test(cls)) continue;
+
+      const t = (el.textContent || '').trim();
+      const m = monthOfText(t);
+      if (!m) continue;
+
+      try {
+        const r = el.getBoundingClientRect();
+        if (r.width > 170 || r.height > 70) continue;
+      } catch (e) { /* 忽略 */ }
+
+      return { el, month: m };
+    }
+    return null;
+  }
+
+  /** 日历里的日格子（排除上/下月的日期和禁用格） */
+  function dayCells(scope) {
+    const out = [];
+    if (!scope) return out;
+
+    for (const el of scope.querySelectorAll('td, div, span')) {
+      if (!isVisible(el)) continue;
+      if (el.children.length) continue;
+
+      const t = (el.textContent || '').trim();
+      if (!/^\d{1,2}$/.test(t)) continue;
+      const d = +t;
+      if (d < 1 || d > 31) continue;
+
+      // 上个月 / 下个月的灰色日期，点了会填错月份
+      try {
+        if (el.closest('.ant-calendar-cell-other-month, .ant-calendar-last-month-cell, ' +
+          '.ant-calendar-next-month-btn-day, .ant-calendar-disabled-cell, ' +
+          '.prev-month, .next-month, .disabled, [aria-disabled="true"]')) continue;
+      } catch (e) { /* 忽略 */ }
+
+      const cls = String(el.className && el.className.baseVal != null
+        ? el.className.baseVal : el.className || '');
+      if (/other-month|prev-month|next-month|disabled|outside/i.test(cls)) continue;
+
+      try {
+        const r = el.getBoundingClientRect();
+        if (r.width > 80 || r.height > 60) continue;
+      } catch (e) { /* 忽略 */ }
+
+      out.push({ el, day: d });
+    }
+    return out;
+  }
+
+  /** 年份表格的上一页 / 下一页（不同组件库的类名和 aria-label 差异很大） */
+  function findYearNav(scope, dir) {
+    const re = dir === 'prev'
+      ? /(^|[-_\s])(prev|previous|super-prev|arrow-left|left)([-_\s]|$)|上一|前一年|上一年/i
+      : /(^|[-_\s])(next|super-next|arrow-right|right)([-_\s]|$)|下一|后一年|下一年/i;
+
+    for (const el of scope.querySelectorAll('button, a, span, div, i')) {
+      if (!isVisible(el)) continue;
+      const cls = String(el.className && el.className.baseVal != null
+        ? el.className.baseVal : el.className || '');
+      const label = (el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('title') || '');
+      if (re.test(cls) || re.test(label)) return el;
+    }
+    return null;
+  }
+
+  /** 目标年份不在当前十年窗口里时，翻页找到它 */
+  async function ensureYearVisible(panel, year) {
+    let p = panel;
+    let cells = dateCells(p, 'year');
+    if (!cells.length) return null;
+
+    for (let i = 0; i < 12; i++) {
+      const hit = cells.find((c) => c.year === year);
+      if (hit) return hit;
+
+      const years = cells.map((c) => c.year);
+      const dir = year < Math.min(...years) ? 'prev' : 'next';
+      const nav = findYearNav(p, dir);
+      if (!nav) return null;
+
+      clickEl(nav);
+      await sleep(200);
+      p = livePanel(p);
+      cells = dateCells(p, 'year');
+      if (!cells.length) return null;
+    }
+    return null;
+  }
+
+  /** 面板上的「确定 / OK」按钮（有的日期控件选完格子还要确认） */
+  function clickConfirm(scope) {
+    if (!scope) return false;
+    for (const b of scope.querySelectorAll('button, a, [role="button"]')) {
+      if (!isVisible(b)) continue;
+      const t = (b.textContent || '').trim();
+      if (/^(确定|确认|完成|ok|OK|Ok)$/.test(t)) {
+        clickEl(b);
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * 年月选择器：面板是「年份表格 + 月份表格」，通用按选项文字匹配对不上
    * （选项文字是「2021年」「7月」，简历里的值是「2021-07」）。
@@ -984,8 +1115,9 @@
     //    至少 4 个年份才算表格——标题栏里的单个「2022年」不算。
     const years = dateCells(p, 'year');
     if (years.length >= 4) {
-      const yc = years.find((c) => c.year === year);
-      if (!yc) return null; // 目标年不在当前窗口，不做危险的翻页猜测
+      // 目标年可能不在当前十年窗口里（生日经常相差几十年），需要翻页
+      const yc = await ensureYearVisible(p, year);
+      if (!yc) return null;
       clickEl(yc.el);
       await sleep(220);
       p = livePanel(panel);
@@ -1003,7 +1135,7 @@
       p = livePanel(panel);
       await waitFor(() => dateCells(p, 'year').length >= 4, 700);
 
-      const yc = dateCells(p, 'year').find((c) => c.year === year);
+      const yc = await ensureYearVisible(p, year);
       if (!yc) return null;
       clickEl(yc.el);
       await sleep(220);
@@ -1016,12 +1148,135 @@
 
     clickEl(mc.el);
     await sleep(200);
+    clickConfirm(p);
+    await sleep(100);
 
     const after = readDisplay(host);
     if (dateShown(after, iso) || sameish(after, iso)) {
       return { ok: true, via: 'month-picker', value: after };
     }
     return null;
+  }
+
+  /**
+   * 完整日期：在日格日历里按 年 → 月 → 日 选中。
+   * 年月选择器那条路不会点「日」，这里专门补上。
+   */
+  async function pickDayFromCalendar(panel, variants, host) {
+    const iso = variants.find((v) => /^\d{4}-\d{2}-\d{2}$/.test(v));
+    if (!iso) return null;
+
+    const year = +iso.slice(0, 4);
+    const month = +iso.slice(5, 7);
+    const day = +iso.slice(8, 10);
+    if (!year || !month || !day) return null;
+
+    let p = panel;
+
+    // A. 先保证年份正确
+    const years = dateCells(p, 'year');
+    if (years.length >= 4) {
+      const yc = await ensureYearVisible(p, year);
+      if (!yc) return null;
+      clickEl(yc.el);
+      await sleep(220);
+      p = livePanel(panel);
+      await waitFor(() => looksLikeDayGrid(p) || dateCells(p, 'month').length >= 6, 700);
+    }
+
+    // B. 如果当前是月份表格，先选月
+    if (dateCells(p, 'month').length >= 6) {
+      const mc = dateCells(p, 'month').find((c) => c.month === month);
+      if (!mc) return null;
+      clickEl(mc.el);
+      await sleep(220);
+      p = livePanel(panel);
+      await waitFor(() => looksLikeDayGrid(p), 700);
+    } else if (looksLikeDayGrid(p)) {
+      // C. 日格视图：年份对不上的先切年，月份对不上的切月
+      const hy = headerYearCell(p);
+      if (hy && hy.year !== year) {
+        clickEl(hy.el);
+        await sleep(220);
+        p = livePanel(panel);
+        await waitFor(() => dateCells(p, 'year').length >= 4, 700);
+
+        const yc = await ensureYearVisible(p, year);
+        if (!yc) return null;
+        clickEl(yc.el);
+        await sleep(220);
+        p = livePanel(panel);
+        await waitFor(() => looksLikeDayGrid(p) || dateCells(p, 'month').length >= 6, 700);
+      }
+
+      const hm = headerMonthCell(p);
+      if (hm && hm.month !== month) {
+        clickEl(hm.el);
+        await sleep(220);
+        p = livePanel(panel);
+        await waitFor(() => dateCells(p, 'month').length >= 6, 700);
+
+        const mc = dateCells(p, 'month').find((c) => c.month === month);
+        if (!mc) return null;
+        clickEl(mc.el);
+        await sleep(220);
+        p = livePanel(panel);
+        await waitFor(() => looksLikeDayGrid(p), 700);
+      }
+    }
+
+    if (!looksLikeDayGrid(p)) return null;
+
+    const dc = dayCells(p).find((c) => c.day === day);
+    if (!dc) return null;
+
+    clickEl(dc.el);
+    await sleep(200);
+    clickConfirm(p);
+    await sleep(120);
+
+    const after = readDisplay(host);
+    if (dateShown(after, iso)) {
+      return { ok: true, via: 'calendar-day', value: after };
+    }
+    return null;
+  }
+
+  /**
+   * 有些「日期 + 至今」组件是双输入结构：一个可见的可编辑文本框，
+   * 旁边挂一个隐藏的日历。日历选中后不会自动回写可见框，
+   * 这里在同一个表单项里找到那个空的日期输入，把值同步过去。
+   */
+  function syncCompanionDate(host, value) {
+    const val = value == null ? '' : String(value).trim();
+    if (!host || !val) return;
+
+    let item = null;
+    try {
+      item = RA.scan.formItemContainer(host);
+    } catch (e) { /* 忽略 */ }
+    if (!item || !item.querySelectorAll) return;
+
+    for (const inp of item.querySelectorAll('input')) {
+      if (inp === host || (host.contains && host.contains(inp))) continue;
+      if (inp.readOnly || inp.disabled || !isVisible(inp)) continue;
+      if (inp.value) continue;
+
+      const cls = String(inp.className && inp.className.baseVal != null
+        ? inp.className.baseVal : inp.className || '');
+      if (/calendar|picker/i.test(cls)) continue;
+
+      const hint = (inp.getAttribute('placeholder') || '') + ' ' +
+        (inp.getAttribute('aria-label') || '') + ' ' + cls;
+      if (!/时间|日期|yyyy|年|月|日|date/i.test(hint)) continue;
+
+      try {
+        record(inp, 'text', inp.value);
+        setNativeValue(inp, val);
+        triggerBlur(inp);
+      } catch (e) { /* 忽略 */ }
+      return;
+    }
   }
 
   /** 面板是不是「日历日格」——有 20 个以上 1~31 的数字格子 */
@@ -1141,7 +1396,10 @@
       const r = await typeDate(host, dateInput, variants);
       // 有些日期控件在输入时会顺手把面板弹出来，别再去点一下把它关掉
       openedByTyping = visibleDropdowns().filter((p) => prePanels.indexOf(p) < 0);
-      if (r && r.ok && r.localized) return r;
+      if (r && r.ok && r.localized) {
+        syncCompanionDate(host, variants[0]);
+        return r;
+      }
       if (r && r.ok) typed = r;
     }
 
@@ -1183,7 +1441,10 @@
 
     if (!panel) {
       // 面板打不开但打字时把值放进去了，还是按打字结果走（由回读复查兜底）
-      if (typed) return typed;
+      if (typed) {
+        syncCompanionDate(host, variants[0]);
+        return typed;
+      }
       return { ok: false, reason: 'panel-not-opened' };
     }
 
@@ -1210,18 +1471,28 @@
     // 3.1b) 年月选择器：面板是年份/月份表格，按选项文字匹配对不上
     if (isDateWidget) {
       const ym = await pickYearMonth(panel, variants, host);
-      if (ym) return ym;
+      if (ym) {
+        syncCompanionDate(host, variants[0]);
+        return ym;
+      }
 
-      // 完整日历的日格子：不要退回「按选项文字点」。变体 2021-09-15 里含有
-      // "15"，会被当成日格子点下去——月份/年份没选对时这就是填错数据。
       if (looksLikeDayGrid(panel)) {
-        // 如果打字时值已经写进去了，关掉日历再确认一次它没被清空
+        // 完整日历：按 年 → 月 → 日 选中
+        const dd = await pickDayFromCalendar(panel, variants, host);
+        if (dd) {
+          syncCompanionDate(host, variants[0]);
+          return dd;
+        }
+
+        // 走到这里说明日格没点成功。如果打字时值已经写进去了，
+        // 关掉日历再确认一次它没被清空。
         if (typed) {
           closePanel(trigger);
           try { if (trigger && trigger.blur) trigger.blur(); } catch (e) { /* 忽略 */ }
           await sleep(180);
           const shown = readDisplay(host);
           if (shown && (sameish(shown, typed.value) || dateShown(shown, typed.value))) {
+            syncCompanionDate(host, variants[0]);
             return typed;
           }
         }
@@ -1231,7 +1502,10 @@
         return { ok: false, reason: 'date-calendar-unhandled', panel: dbg };
       }
 
-      if (typed) return typed; // 面板路线不通，退回打字结果
+      if (typed) {
+        syncCompanionDate(host, variants[0]);
+        return typed; // 面板路线不通，退回打字结果
+      }
     }
 
     // 3.2) 普通下拉：先直接点，点不到再输入关键字过滤（可搜索下拉）
@@ -1259,6 +1533,8 @@
       const v = readDisplay(host);
       return v && v !== before ? v : null;
     }, 500)) || readDisplay(host);
+
+    if (isDateWidget) syncCompanionDate(host, variants[0]);
 
     return { ok: true, via: 'click-recipe', value: after };
   }
