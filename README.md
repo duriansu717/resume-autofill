@@ -25,7 +25,30 @@
 
 ### 截图
 
-> 待补充：弹窗、数据面板、首页卡片、模板页、导入页
+**简历数据面板**：页面右侧常驻，点输入框、再点数据就能填入
+
+![简历数据面板](docs/screenshots/data-panel.png)
+
+| 扩展弹窗 | 简历填写 |
+|---|---|
+| <img src="docs/screenshots/popup.png" width="300" alt="扩展弹窗"> | <img src="docs/screenshots/fill.png" width="660" alt="简历填写"> |
+
+<details>
+<summary><b>更多截图</b>：JSON 导入 / 模板编辑 / 备份与恢复</summary>
+
+**JSON 标签页**：可以直接编辑，也可以把 AI 转换的结果粘进来或拖入文件
+
+![JSON 导入](docs/screenshots/json-import.png)
+
+**模板编辑**：增删分组和字段，改动立即生效
+
+![模板编辑](docs/screenshots/template.png)
+
+**备份与恢复**：全部模板、简历和设置打包成一个文件
+
+![备份与恢复](docs/screenshots/backup.png)
+
+</details>
 
 ---
 
