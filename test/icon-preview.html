@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>图标预览</title>
+<style>
+  body {
+    margin: 0; padding: 40px;
+    font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    color: #0f172a; background: #f8fafc;
+  }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  .lead { color: #64748b; margin: 0 0 32px; }
+  section { margin-bottom: 36px; }
+  h2 { font-size: 13px; color: #64748b; font-weight: 600; margin: 0 0 14px; }
+
+  .row { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
+  figure { margin: 0; text-align: center; }
+  figure img { display: block; margin: 0 auto 8px; }
+  figcaption { font-size: 11px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+
+  /* 模拟 Chrome 工具栏：深色背景 + 16px 图标 */
+  .toolbar {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 8px 14px; border-radius: 10px;
+    background: #292a2d;
+  }
+  .toolbar img { display: block; }
+  .toolbar span { color: #e8eaed; font-size: 12px; }
+
+  .light, .dark { padding: 24px; border-radius: 14px; display: inline-block; }
+  .light { background: #fff; border: 1px solid #e2e8f0; }
+  .dark { background: #0f172a; }
+</style>
+</head>
+<body>
+
+<h1>图标预览</h1>
+<p class="lead">
+  <code>tools/make-icons.js</code> 生成的四个尺寸。改颜色或形状后重新运行该脚本即可。
+</p>
+
+<section>
+  <h2>四种尺寸</h2>
+  <div class="row">
+    <figure><img src="../icons/icon16.png" width="16" height="16" alt="16"><figcaption>16</figcaption></figure>
+    <figure><img src="../icons/icon32.png" width="32" height="32" alt="32"><figcaption>32</figcaption></figure>
+    <figure><img src="../icons/icon48.png" width="48" height="48" alt="48"><figcaption>48</figcaption></figure>
+    <figure><img src="../icons/icon128.png" width="128" height="128" alt="128"><figcaption>128</figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <h2>Chrome 工具栏里的样子（16px）</h2>
+  <div class="toolbar">
+    <img src="../icons/icon16.png" width="16" height="16" alt="">
+    <span>简历自动填写</span>
+  </div>
+</section>
+
+<section>
+  <h2>深浅背景对比</h2>
+  <div class="row">
+    <div class="light"><img src="../icons/icon128.png" width="64" height="64" alt=""></div>
+    <div class="dark"><img src="../icons/icon128.png" width="64" height="64" alt=""></div>
+  </div>
+</section>
+
+</body>
+</html>

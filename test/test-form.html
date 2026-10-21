@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>简历填写测试页</title>
+<style>
+  body { font: 14px/1.6 "Microsoft YaHei", sans-serif; max-width: 900px; margin: 24px auto; padding: 0 16px; color: #222; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 15px; margin: 28px 0 10px; padding-top: 14px; border-top: 2px solid #eee; }
+  .item { display: flex; align-items: center; margin-bottom: 10px; }
+  .item > label, .item > span.lbl { flex: 0 0 130px; color: #666; }
+  input[type=text], input[type=email], input[type=tel], input[type=number], select, textarea {
+    padding: 5px 8px; border: 1px solid #ccc; border-radius: 4px; font: inherit; font-size: 13px; min-width: 200px;
+  }
+  textarea { width: 100%; min-height: 60px; }
+  table { border-collapse: collapse; }
+  td { padding: 6px 10px; border: 1px solid #ddd; }
+  td:first-child { background: #f8f8f8; color: #666; white-space: nowrap; }
+  .entry { border: 1px solid #e5e5e5; border-radius: 6px; padding: 12px; margin-bottom: 10px; background: #fcfcfc; }
+  .entry h3 { margin: 0 0 10px; font-size: 13px; color: #888; }
+  .add { padding: 5px 14px; cursor: pointer; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .note { background: #fffbe6; border-left: 3px solid #faad14; padding: 8px 12px; font-size: 13px; margin: 12px 0; }
+  .react-box { background: #f0f7ff; border: 1px solid #bae0ff; border-radius: 6px; padding: 12px; }
+  .react-box .state { font-family: monospace; font-size: 12px; color: #0958d9; }
+  #log { font-family: monospace; font-size: 12px; white-space: pre-wrap; color: #555; background: #fafafa; padding: 8px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<h1>简历填写测试页</h1>
+<p>用来验证扩展的匹配与填充行为。每块覆盖一类真实站点的写法。</p>
+
+<!-- ══════════ 1. 标准 label[for] ══════════ -->
+<h2>1. 基本信息（标准 label for）</h2>
+<div>
+  <div class="item"><label for="f-name">姓名</label><input id="f-name" type="text" name="userName"></div>
+  <div class="item"><label for="f-gender">性别</label>
+    <select id="f-gender" name="sex">
+      <option value="">请选择</option>
+      <option value="1">男</option>
+      <option value="2">女</option>
+    </select>
+  </div>
+  <div class="item"><label for="f-phone">手机号码</label><input id="f-phone" type="tel" name="mobile" maxlength="11"></div>
+  <div class="item"><label for="f-email">电子邮箱</label><input id="f-email" type="email" name="email"></div>
+  <div class="item"><label for="f-id">身份证号</label><input id="f-id" type="text" name="idCard" maxlength="18"></div>
+  <div class="item"><label for="f-city">现居城市</label><input id="f-city" type="text" name="city"></div>
+  <div class="item"><label for="f-addr">详细地址</label><input id="f-addr" type="text" name="address"></div>
+  <div class="item"><label for="f-politics">政治面貌</label>
+    <select id="f-politics" name="politicalStatus">
+      <option value="">请选择</option>
+      <option>中共党员</option>
+      <option>共青团员</option>
+      <option>群众</option>
+    </select>
+  </div>
+</div>
+
+<!-- ══════════ 2. 表格布局，无 label 关联 ══════════ -->
+<h2>2. 表格布局（老式写法，无 label 关联）</h2>
+<table>
+  <tr><td>姓名</td><td><input type="text" name="txtName"></td>
+      <td>联系电话</td><td><input type="text" name="txtPhone"></td></tr>
+  <tr><td>毕业院校</td><td><input type="text" name="txtSchool"></td>
+      <td>所学专业</td><td><input type="text" name="txtMajor"></td></tr>
+</table>
+
+<!-- ══════════ 3. 拆分日期 ══════════ -->
+<h2>3. 拆分日期（年/月/日 三个控件）</h2>
+<div class="item">
+  <label>出生日期</label>
+  <div class="row">
+    <select name="birthYear" id="bd-y">
+      <option value="">年</option>
+      <option>1995</option><option>1996</option><option>1997</option><option>1998</option>
+      <option>1999</option><option>2000</option><option>2001</option>
+    </select>
+    <select name="birthMonth" id="bd-m">
+      <option value="">月</option>
+      <option value="01">01</option><option value="02">02</option><option value="03">03</option>
+      <option value="04">04</option><option value="05">05</option><option value="06">06</option>
+      <option value="07">07</option><option value="08">08</option><option value="09">09</option>
+      <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+    </select>
+    <input name="birthDay" id="bd-d" type="text" maxlength="2" style="min-width:60px">
+  </div>
+</div>
+
+<!-- ══════════ 4. 只有 placeholder ══════════ -->
+<h2>4. 只有 placeholder 的字段</h2>
+<div>
+  <div class="item"><input type="text" placeholder="请输入您的姓名" name="a1"></div>
+  <div class="item"><input type="text" placeholder="请输入手机号" name="a2"></div>
+  <div class="item"><input type="text" placeholder="请输入邮箱地址" name="a3"></div>
+  <div class="item"><input type="text" placeholder="张三" name="a4"></div>
+  <div class="item"><input type="text" placeholder="13800138000" name="a5"></div>
+</div>
+<p class="note">最后两个是「示例值型」placeholder（张三 / 13800138000），它们不是标签，匹配时应该被大幅降权。</p>
+
+<!-- ══════════ 5. 求职意向（radio + 文字标签堆叠） ══════════ -->
+<h2>5. 求职意向</h2>
+<div>
+  <div class="item"><span class="lbl">期望职位</span><input type="text" name="expectPosition"></div>
+  <div class="item"><span class="lbl">期望城市</span><input type="text" name="expectCity"></div>
+  <div class="item">
+    <span class="lbl">工作性质</span>
+    <label><input type="radio" name="jobType" value="full"> 全职</label>
+    <label><input type="radio" name="jobType" value="part"> 兼职</label>
+    <label><input type="radio" name="jobType" value="intern"> 实习</label>
+  </div>
+  <div class="item"><span class="lbl">自我评价</span><textarea name="selfEval"></textarea></div>
+</div>
+
+<!-- ══════════ 6. 教育经历（重复块 + 添加按钮） ══════════ -->
+<h2>6. 教育经历（可重复块）</h2>
+<div id="edu-list">
+  <div class="entry">
+    <h3>教育经历 1</h3>
+    <div class="item"><label>学校名称</label><input type="text" name="edu_school_0"></div>
+    <div class="item"><label>专业</label><input type="text" name="edu_major_0"></div>
+    <div class="item"><label>学历</label>
+      <select name="edu_degree_0"><option value="">请选择</option><option>大专</option><option>本科</option><option>硕士</option><option>博士</option></select>
+    </div>
+    <div class="item"><label>入学时间</label><input type="text" name="edu_start_0" placeholder="2020-09"></div>
+    <div class="item"><label>毕业时间</label><input type="text" name="edu_end_0" placeholder="2024-06"></div>
+  </div>
+</div>
+<button class="add" onclick="addEntry('edu-list','教育经历',['学校名称','专业','学历','入学时间','毕业时间'])">+ 添加教育经历</button>
+
+<!-- ══════════ 7. 工作经历（重复块） ══════════ -->
+<h2>7. 工作经历（可重复块）</h2>
+<div id="work-list">
+  <div class="entry">
+    <h3>工作经历 1</h3>
+    <div class="item"><label>公司名称</label><input type="text" name="work_company_0"></div>
+    <div class="item"><label>职位名称</label><input type="text" name="work_position_0"></div>
+    <div class="item"><label>开始时间</label><input type="text" name="work_start_0" placeholder="2020-07"></div>
+    <div class="item"><label>结束时间</label><input type="text" name="work_end_0" placeholder="2023-05"></div>
+    <div class="item"><label>工作内容</label><textarea name="work_desc_0"></textarea></div>
+  </div>
+</div>
+<button class="add" onclick="addEntry('work-list','工作经历',['公司名称','职位名称','开始时间','结束时间','工作内容'])">+ 添加工作经历</button>
+
+<p class="note">
+  「入学时间」和「开始时间」在不同的区块里语义不同。这一块专门用来验证区块识别是否生效——
+  如果所有「开始时间」都被填成同一个值，说明区块识别没起作用。
+</p>
+
+<!-- ══════════ 8. React 受控输入模拟 ══════════ -->
+<h2>8. React 受控组件模拟</h2>
+<div class="react-box">
+  <p style="margin-top:0">这两个输入框模拟 React 受控组件：在实例上装了一层 value 拦截器，
+     并且每 350ms 用内部 state 重渲染一次 DOM。</p>
+  <div class="item"><label for="rc-name">姓名</label><input id="rc-name" type="text"></div>
+  <div class="item"><label for="rc-mail">邮箱</label><input id="rc-mail" type="text"></div>
+  <p class="state">React state：姓名=<span id="rc-state-name">（空）</span>　邮箱=<span id="rc-state-mail">（空）</span></p>
+  <p class="state">朴素写法 <code>el.value = x</code> 会被丢弃并覆盖回空；只有走原生 setter 才能填进去。</p>
+</div>
+
+<!-- ══════════ 9. 登录表单（应该被整体跳过） ══════════ -->
+<h2>9. 登录表单（应被跳过）</h2>
+<form>
+  <div class="item"><label for="lg-u">用户名</label><input id="lg-u" type="text" name="username"></div>
+  <div class="item"><label for="lg-p">密码</label><input id="lg-p" type="password" name="password"></div>
+  <button type="button">登录</button>
+</form>
+<p class="note">含密码框的表单应当被整体跳过，绝不能往里填简历数据。</p>
+
+<!-- ══════════ 10. 验证码 / 搜索（应被跳过） ══════════ -->
+<h2>10. 验证码与搜索框（应被跳过）</h2>
+<div>
+  <div class="item"><label for="cap">短信验证码</label><input id="cap" type="text" name="smsCode"></div>
+  <div class="item"><label for="sea">搜索</label><input id="sea" type="text" name="keyword" placeholder="搜索职位"></div>
+</div>
+
+<!-- ══════════ 11. 其他区块 ══════════ -->
+<h2>11. 其他区块（证书 / 语言 / 获奖 / 紧急联系人）</h2>
+
+<h3 style="font-size:13px;color:#888;margin:14px 0 8px">证书信息</h3>
+<div id="cert-list">
+  <div class="entry">
+    <div class="item"><label>证书名称</label><input type="text" name="cert_name_0"></div>
+    <div class="item"><label>证书等级</label><input type="text" name="cert_level_0"></div>
+    <div class="item"><label>颁发机构</label><input type="text" name="cert_issuer_0"></div>
+    <div class="item"><label>获得时间</label><input type="text" name="cert_date_0" placeholder="2021-11"></div>
+  </div>
+</div>
+<button class="add" onclick="addEntry('cert-list','证书',['证书名称','证书等级','颁发机构','获得时间'])">+ 添加证书</button>
+
+<h3 style="font-size:13px;color:#888;margin:18px 0 8px">语言能力</h3>
+<div>
+  <div class="item"><label>语种</label><input type="text" name="lang_name"></div>
+  <div class="item"><label>掌握程度</label><input type="text" name="lang_level"></div>
+  <div class="item"><label>考试成绩</label><input type="text" name="lang_score"></div>
+</div>
+
+<h3 style="font-size:13px;color:#888;margin:18px 0 8px">获奖情况</h3>
+<div id="award-list">
+  <div class="entry">
+    <div class="item"><label>奖项名称</label><input type="text" name="award_name_0"></div>
+    <div class="item"><label>奖项级别</label><input type="text" name="award_level_0"></div>
+    <div class="item"><label>获奖时间</label><input type="text" name="award_date_0"></div>
+  </div>
+</div>
+<button class="add" onclick="addEntry('award-list','奖项',['奖项名称','奖项级别','获奖时间'])">+ 添加奖项</button>
+
+<h3 style="font-size:13px;color:#888;margin:18px 0 8px">紧急联系人</h3>
+<div>
+  <div class="item"><label>紧急联系人姓名</label><input type="text" name="emg_name"></div>
+  <div class="item"><label>与本人关系</label><input type="text" name="emg_relation"></div>
+  <div class="item"><label>紧急联系人电话</label><input type="tel" name="emg_phone" maxlength="11"></div>
+</div>
+
+<p class="note">
+  「证书名称」「奖项名称」和上面第 1 块的「姓名」都带「名称」二字。
+  如果证书名被填成了你的名字，说明反向别名没生效。
+</p>
+
+<!-- ══════════ 12. 网申常见区块 ══════════ -->
+<h2>12. 网申常见区块（实践 / 学生干部 / IT技能）</h2>
+
+<h3 style="font-size:13px;color:#888;margin:14px 0 8px">实践经历</h3>
+<div id="comp-list">
+  <div class="entry">
+    <div class="item"><label>大赛名称</label><input type="text" name="comp_name_0"></div>
+    <div class="item"><label>大赛成绩</label><input type="text" name="comp_result_0"></div>
+    <div class="item"><label>获得时间</label><input type="text" name="comp_date_0"></div>
+    <div class="item"><label>实践经历</label><textarea name="comp_desc_0"></textarea></div>
+  </div>
+</div>
+<button class="add" onclick="addEntry('comp-list','实践经历',['大赛名称','大赛成绩','获得时间','实践经历'])">+ 添加</button>
+
+<h3 style="font-size:13px;color:#888;margin:18px 0 8px">学生干部经历</h3>
+<div class="entry">
+  <div class="item"><label>任职时间</label><input type="text" name="cadre_time"></div>
+  <div class="item"><label>任职组织</label><input type="text" name="cadre_org"></div>
+  <div class="item"><label>工作描述</label><textarea name="cadre_desc"></textarea></div>
+</div>
+
+<h3 style="font-size:13px;color:#888;margin:18px 0 8px">IT技能</h3>
+<div>
+  <div class="item"><label>技能名称</label><input type="text" name="it_name"></div>
+  <div class="item"><label>掌握程度</label><input type="text" name="it_level"></div>
+</div>
+
+<h3 style="font-size:13px;color:#888;margin:18px 0 8px">语言能力（与 IT 技能同名标签）</h3>
+<div>
+  <div class="item"><label>语种</label><input type="text" name="lang_name2"></div>
+  <div class="item"><label>掌握程度</label>
+    <select name="lang_level2">
+      <option value="">请选择</option>
+      <option>精通</option><option>熟练</option><option>一般</option>
+    </select>
+  </div>
+</div>
+
+<p class="note">
+  这一块专门测「同名标签靠区块区分」：两个「掌握程度」、两个「获得时间」分别属于不同的区块，
+  填错就说明区块识别没生效。「工作描述」同时出现在工作经历和学生干部里，也是同样的考验。
+</p>
+
+<!-- ══════════ 13. 模拟自定义下拉组件 ══════════ -->
+<h2>13. 模拟自定义下拉组件（Ant Design / Element UI 那一类）</h2>
+<div class="react-box">
+  <p style="margin-top:0">
+    这两个下拉不是真的 <code>&lt;select&gt;</code>：内层 input 是 <b>readonly</b> 的，
+    真正显示选项的是外面一层 div。扩展必须模拟点击才能选中。
+  </p>
+
+  <div class="item">
+    <span class="lbl">学历</span>
+    <div class="fake-select" id="fs-degree">
+      <input type="text" readonly placeholder="请选择" role="combobox"
+             aria-haspopup="listbox" aria-expanded="false">
+      <div class="fake-dropdown" hidden role="listbox">
+        <div role="option" data-value="1">大专</div>
+        <div role="option" data-value="2">大学本科</div>
+        <div role="option" data-value="3">硕士研究生</div>
+        <div role="option" data-value="4">博士研究生</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="item">
+    <span class="lbl">性别</span>
+    <div class="fake-select" id="fs-gender">
+      <input type="text" readonly placeholder="请选择" role="combobox"
+             aria-haspopup="listbox" aria-expanded="false">
+      <div class="fake-dropdown" hidden role="listbox">
+        <div role="option" data-value="M">男</div>
+        <div role="option" data-value="F">女</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="state">当前选中：学历=<span id="fs-degree-val">（空）</span>　性别=<span id="fs-gender-val">（空）</span></p>
+</div>
+
+<style>
+  .fake-select { position: relative; display: inline-block; }
+  .fake-dropdown {
+    position: absolute; top: 100%; left: 0; z-index: 100; min-width: 200px;
+    background: #fff; border: 1px solid #ccc; border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12); padding: 4px 0;
+  }
+  .fake-dropdown [role=option] { padding: 6px 12px; cursor: pointer; font-size: 13px; }
+  .fake-dropdown [role=option]:hover { background: #e6f4ff; }
+</style>
+
+<!-- ══════════ 日志 ══════════ -->
+<h2>事件日志</h2>
+<div id="log"></div>
+
+<script>
+// ─────────── 重复块：添加一条 ───────────
+let counter = {};
+function addEntry(listId, title, labels) {
+  counter[listId] = (counter[listId] || 1) + 1;
+  const n = counter[listId];
+  const list = document.getElementById(listId);
+  const div = document.createElement('div');
+  div.className = 'entry';
+  const h = document.createElement('h3');
+  h.textContent = title + ' ' + n;
+  div.appendChild(h);
+  const prefix = listId === 'edu-list' ? 'edu' : 'work';
+  labels.forEach((label, i) => {
+    const item = document.createElement('div');
+    item.className = 'item';
+    const l = document.createElement('label');
+    l.textContent = label;
+    item.appendChild(l);
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.name = prefix + '_' + i + '_' + (n - 1);
+    item.appendChild(inp);
+    div.appendChild(item);
+  });
+  list.appendChild(div);
+  log('添加了「' + title + ' ' + n + '」');
+}
+
+// ─────────── 事件日志 ───────────
+function log(msg) {
+  const el = document.getElementById('log');
+  el.textContent += msg + '\n';
+  if (el.textContent.length > 4000) el.textContent = el.textContent.slice(-3000);
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+    log('input  ' + (e.target.name || e.target.id) + ' = ' + JSON.stringify(e.target.value));
+  }
+}, true);
+
+document.addEventListener('change', (e) => {
+  if (e.target.tagName === 'SELECT') {
+    log('change ' + (e.target.name || e.target.id) + ' = ' + JSON.stringify(e.target.value));
+  }
+}, true);
+
+// ─────────── React 受控组件模拟 ───────────
+/**
+ * 忠实复刻 React 的行为：
+ *   1. track() 在实例上装一层 value 拦截器，任何 el.value = x 都会
+ *      同步更新 tracker 内部的值
+ *   2. input 事件回调里比较 tracker 值和 DOM 值，相同就认为「没变化」，丢弃
+ *   3. 定时重渲染，用内部 state 覆盖 DOM
+ *
+ * 只有绕过实例拦截器、直接用原型 setter 写值，并手动把 tracker 推回旧值，
+ * 才能让第 2 步认为「变了」，从而更新 state。
+ */
+function simulateReactControlled(input, stateEl) {
+  const proto = HTMLInputElement.prototype;
+  const nativeDesc = Object.getOwnPropertyDescriptor(proto, 'value');
+
+  let state = input.value;
+  let tracked = input.value;
+
+  const tracker = {
+    getValue() { return tracked; },
+    setValue(v) { tracked = '' + v; },
+  };
+
+  // 关键：实例级拦截器
+  Object.defineProperty(input, 'value', {
+    configurable: true,
+    get() { return nativeDesc.get.call(input); },
+    set(v) { tracked = '' + v; nativeDesc.set.call(input, v); },
+  });
+  Object.defineProperty(input, '_valueTracker', { value: tracker, configurable: true });
+
+  input.addEventListener('input', () => {
+    if (tracker.getValue() === input.value) return; // React 认为没变，丢弃
+    tracker.setValue(input.value);
+    state = input.value;
+    stateEl.textContent = state === '' ? '（空）' : state;
+    log('React state 更新：' + input.id + ' = ' + JSON.stringify(state));
+  });
+
+  // 定时重渲染——朴素的 el.value = x 会被这里冲掉
+  setInterval(() => {
+    if (input.value !== state) {
+      tracker.setValue(state);
+      nativeDesc.set.call(input, state);
+      log('React 重渲染，覆盖 ' + input.id + ' 回 ' + JSON.stringify(state));
+    }
+  }, 350);
+}
+
+simulateReactControlled(
+  document.getElementById('rc-name'),
+  document.getElementById('rc-state-name')
+);
+simulateReactControlled(
+  document.getElementById('rc-mail'),
+  document.getElementById('rc-state-mail')
+);
+
+// ─────────── 模拟自定义下拉组件 ───────────
+/**
+ * 复刻 Ant Design / Element UI 那一类的行为：
+ *   1. 内层 input 是 readonly 的，用户不能直接往里打字
+ *   2. 点击触发器才弹出选项面板（面板是 div，不是 <option>）
+ *   3. 选中靠点击面板里的 [role=option]
+ *
+ * 扩展如果只处理原生 <select>，这两个框就完全填不了。
+ */
+document.querySelectorAll('.fake-select').forEach((fs) => {
+  const input = fs.querySelector('input');
+  const dd = fs.querySelector('.fake-dropdown');
+  const out = document.getElementById(fs.id + '-val');
+
+  function open() {
+    dd.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+  }
+  function close() {
+    dd.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+  }
+
+  // mousedown 而不是 click —— 真实组件库普遍监听 mousedown
+  input.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    open();
+  });
+  input.addEventListener('click', open);
+
+  dd.addEventListener('click', (e) => {
+    const opt = e.target.closest('[role=option]');
+    if (!opt) return;
+    input.value = opt.textContent.trim();   // 注意：直接写 value，不派发事件
+    fs.dataset.value = opt.dataset.value;
+    if (out) out.textContent = opt.textContent.trim();
+    log('自定义下拉选中：' + fs.id + ' = ' + opt.textContent.trim());
+    close();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!fs.contains(e.target)) close();
+  });
+});
+</script>
+</body>
+</html>

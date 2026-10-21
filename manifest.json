@@ -1,0 +1,68 @@
+{
+  "manifest_version": 3,
+  "name": "简历自动填写",
+  "version": "1.0.0",
+  "description": "把结构化简历数据自动填进任意网站的求职表单",
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "permissions": ["storage", "webNavigation", "clipboardWrite"],
+  "host_permissions": ["<all_urls>"],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/icon48.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_title": "简历自动填写",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": true
+  },
+
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "src/shared/00-ns.js",
+        "src/shared/normalize.js",
+        "src/shared/fields.js",
+        "src/shared/storage.js",
+        "src/shared/importer.js",
+        "src/shared/select.js",
+        "src/shared/dialog.js",
+        "src/content/10-scan.js",
+        "src/content/20-section.js",
+        "src/content/30-score.js",
+        "src/content/40-fill.js",
+        "src/content/50-overlay.js",
+        "src/content/60-pick.js",
+        "src/content/70-datapanel.js",
+        "src/content/90-main.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ]
+}

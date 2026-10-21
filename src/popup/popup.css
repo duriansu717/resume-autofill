@@ -1,0 +1,516 @@
+/* ────────────────────────────────
+   Apple 风格设计变量
+   近白底 + 纯白卡片 + 极浅描边 + 大圆角
+   ──────────────────────────────── */
+:root {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --bg-muted: rgba(0, 0, 0, .045);
+  --fg: #1d1d1f;
+  --fg-muted: #6e6e73;
+  --fg-subtle: #86868b;
+  --border: rgba(0, 0, 0, .08);
+  --border-strong: rgba(0, 0, 0, .14);
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-soft: rgba(0, 113, 227, .08);
+  --ok: #34c759;
+  --warn: #ff9500;
+  --bad: #ff3b30;
+  --radius: 24px;
+  --radius-sm: 13px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .04);
+  --shadow: 0 2px 8px rgba(0, 0, 0, .05), 0 12px 32px rgba(0, 0, 0, .06);
+  --ease: cubic-bezier(.32, .72, 0, 1);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+          "Microsoft YaHei", "Helvetica Neue", sans-serif;
+
+  /* 自定义下拉箭头：原生三角在不同系统上长得差别太大 */
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2386868b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  /* 必须显式声明。不写的话 Chrome 会按系统的深色偏好去画弹窗底座和滚动条，
+     扩展选的是浅色、系统是深色时，底部就会漏出一条黑边 */
+  color-scheme: light;
+
+  /* 玻璃材质。弹窗是个独立窗口，背后没有网页可透，所以自己铺一层
+     柔和的色晕当「背景」，再让卡片真去 backdrop-blur 它——
+     这样模糊是真生效的，不是贴图。颗粒和边缘高光与页面内浮层同一套。 */
+  /* 色晕要够浓，玻璃才有东西可透、可染 */
+  --bg-image:
+    radial-gradient(120% 74% at 4% -6%, rgba(108, 160, 255, .46) 0%, rgba(108, 160, 255, 0) 58%),
+    radial-gradient(96% 66% at 104% 6%, rgba(178, 138, 255, .38) 0%, rgba(178, 138, 255, 0) 54%),
+    radial-gradient(120% 70% at 50% 108%, rgba(86, 202, 235, .34) 0%, rgba(86, 202, 235, 0) 62%),
+    linear-gradient(180deg, #f8fafe 0%, #eef2fa 100%);
+  /* 玻璃要「半透」才叫玻璃。之前 88% 白把色晕全挡在外面，
+     卡片看着就是一块死白 —— 这次压到 50–62%，底色才透得上来。
+     最后一层是磨砂颗粒，透明度烘进 SVG 里，不需要额外的覆盖层 */
+  --glass:
+    linear-gradient(112deg, rgba(255, 255, 255, .55) 0%, rgba(255, 255, 255, .10) 30%, rgba(255, 255, 255, 0) 52%),
+    linear-gradient(152deg, rgba(255, 255, 255, .62) 0%, rgba(240, 244, 252, .54) 55%, rgba(224, 232, 248, .50) 100%),
+    var(--grain);
+  --glass-edge: rgba(255, 255, 255, .95);
+  --glass-rim: rgba(255, 255, 255, .5);
+  --glass-filter: blur(26px) saturate(190%) brightness(1.04);
+  --glass-hover: rgba(255, 255, 255, .5);
+  --glass-shadow: 0 1px 2px rgba(0, 0, 0, .03), 0 10px 28px rgba(0, 0, 0, .08);
+  /* 颗粒的 5.5% 透明度烘在 rect 上：直接当背景图层用，不占一个元素 */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)' opacity='0.055'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="dark"] {
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --bg-muted: rgba(255, 255, 255, .07);
+  /* 深色主题下文字一律纯白 */
+  --fg: #ffffff;
+  --fg-muted: #ffffff;
+  --fg-subtle: #ffffff;
+  --border: rgba(255, 255, 255, .12);
+  --border-strong: rgba(255, 255, 255, .2);
+  --accent: #0a84ff;
+  --accent-hover: #409cff;
+  --accent-soft: rgba(10, 132, 255, .16);
+  --ok: #30d158;
+  --warn: #ff9f0a;
+  --bad: #ff453a;
+  --shadow-sm: none;
+  --shadow: none;
+  --bg-image:
+    radial-gradient(120% 74% at 4% -6%, rgba(32, 96, 220, .62) 0%, rgba(32, 96, 220, 0) 58%),
+    radial-gradient(96% 66% at 104% 6%, rgba(116, 62, 196, .52) 0%, rgba(116, 62, 196, 0) 54%),
+    radial-gradient(120% 70% at 50% 108%, rgba(14, 116, 150, .46) 0%, rgba(14, 116, 150, 0) 62%),
+    linear-gradient(180deg, #0b0d12 0%, #000000 100%);
+  --glass:
+    linear-gradient(112deg, rgba(255, 255, 255, .13) 0%, rgba(255, 255, 255, .03) 30%, rgba(255, 255, 255, 0) 52%),
+    linear-gradient(152deg, rgba(82, 86, 100, .62) 0%, rgba(46, 49, 60, .56) 55%, rgba(28, 30, 38, .52) 100%),
+    var(--grain);
+  --glass-edge: rgba(255, 255, 255, .2);
+  --glass-rim: rgba(255, 255, 255, .08);
+  --glass-filter: blur(26px) saturate(170%) brightness(.96);
+  --glass-hover: rgba(255, 255, 255, .10);
+  --glass-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 32px rgba(0, 0, 0, .5);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a1a1a6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+/* 弹窗是浏览器给的一小块视口，宽高都由内容决定。
+   overflow-x 必须掐死：只要内容比视口宽一个像素，底部就会多出一条横向滚动条 */
+html, body { overflow-x: hidden; }
+
+/* 背景必须画在 html 上。画在 body 上时，只要 body 比窗口矮哪怕零点几像素
+   （子像素舍入就会），最底下就会漏出窗口底座的颜色 —— 深色系统下就是一条黑线 */
+html {
+  background: var(--bg-image);
+}
+
+body {
+  width: 360px;
+  margin: 0;
+  /* 行高用整数像素而不是 1.5：13 × 1.5 = 19.5，行盒累积出小数后，
+     文档高度会带零头，浏览器舍入时底部就会差出一像素 */
+  font: 13px/20px var(--font);
+  color: var(--fg);
+  background: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── 头部 ── */
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px 14px;
+}
+
+/* 直接用扩展图标，和工具栏上那个是同一张图 */
+.mark {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: block;
+  border-radius: 9px;
+}
+
+.titles {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+
+.ver {
+  font-size: 11px;
+  color: var(--fg-subtle);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+}
+
+/* 右上角的主题切换 */
+.theme-select {
+  flex: 0 0 auto;
+  margin-left: auto;
+  max-width: 96px;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 3px 20px 3px 8px;
+  border: 0;
+  border-radius: 10px;
+  background-color: var(--bg-muted);
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background-color .2s var(--ease), color .2s var(--ease);
+}
+
+.theme-select:hover { color: var(--fg); }
+.theme-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── 当前简历切换 ── */
+
+.resume-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 18px 10px;
+}
+
+.resume-label {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--fg-subtle);
+}
+
+.resume-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 4px 26px 4px 9px;
+  border: 0;
+  border-radius: 9px;
+  background-color: var(--bg-muted);
+  background-image: var(--chevron);
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background-color .2s var(--ease), color .2s var(--ease);
+}
+
+.resume-select:hover { color: var(--fg); }
+.resume-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── 简历摘要卡 ── */
+
+.card {
+  margin: 0 18px 16px;
+  padding: 16px;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  border: 1px solid var(--glass-rim);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 var(--glass-edge), var(--glass-shadow);
+}
+
+.card .p-name {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+  /* 1.35 × 17 = 22.95，同样会留下零头 */
+  line-height: 23px;
+}
+
+.card .p-name.empty {
+  color: var(--fg-muted);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.card .p-meta {
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--fg-muted);
+  word-break: break-all;
+  letter-spacing: -.005em;
+}
+
+.card .p-meta:empty { display: none; }
+
+.card .p-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.card .p-counts:empty { display: none; }
+
+.pill {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--bg-muted);
+  color: var(--fg-muted);
+  font-size: 11px;
+  line-height: 18px;
+  letter-spacing: -.005em;
+}
+
+/* ── 按钮 ── */
+
+.actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 18px;
+}
+
+.actions + .actions { margin-top: 8px; }
+
+.btn {
+  flex: 1 1 auto;
+  padding: 9px 14px;
+  border: 1px solid var(--glass-rim);
+  /* 胶囊形：这一版按钮是页面上最大的几个矩形，圆角小了整页就显得硬 */
+  border-radius: 999px;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow: inset 0 1px 0 var(--glass-edge),
+              0 1px 2px rgba(0, 0, 0, .04),
+              0 4px 14px rgba(0, 0, 0, .05);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform .18s var(--ease), background-color .18s var(--ease),
+              box-shadow .18s var(--ease), opacity .18s var(--ease);
+}
+
+/* 只叠一层底色，玻璃的渐变和高光留着 —— 换成纯色就变回一块白牌了 */
+.btn:hover:not(:disabled) {
+  background-color: var(--glass-hover);
+  box-shadow: inset 0 1px 0 var(--glass-edge),
+              0 2px 10px rgba(0, 0, 0, .1);
+}
+
+.btn:active:not(:disabled) { transform: scale(.975); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:disabled { opacity: .4; cursor: default; }
+
+.btn-primary {
+  padding: 11px 14px;
+  border-color: transparent;
+  background: var(--accent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  box-shadow: 0 1px 3px rgba(0, 113, 227, .24);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  box-shadow: 0 3px 14px rgba(0, 113, 227, .3);
+}
+
+/* ── 提示文字 ── */
+
+.hintline {
+  margin: 12px 18px 0;
+  padding: 0;
+  font-size: 11.5px;
+  line-height: 18px;
+  color: var(--fg-subtle);
+  letter-spacing: -.005em;
+}
+
+/* ── 结果 ── */
+
+.result {
+  margin: 16px 18px 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.result .stats {
+  display: flex;
+  gap: 16px;
+  padding-bottom: 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.result .stats b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.result .stats .stat-hi b { color: var(--ok); }
+.result .stats .stat-lo b { color: var(--warn); }
+.result .stats .stat-bad b { color: var(--bad); }
+.result .stats .stat-sk b { color: var(--fg-subtle); }
+
+.result .summary-line {
+  font-size: 11.5px;
+  color: var(--fg-subtle);
+  padding-bottom: 6px;
+}
+
+.result ul { list-style: none; margin: 0; padding: 0; }
+
+.result li {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.result li .k {
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result li .v {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result li.low .v { color: var(--warn); }
+.result li.fail .v { color: var(--bad); }
+
+/* ── 底部 ── */
+
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px 18px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+}
+
+footer a {
+  flex: 0 0 auto;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+footer a:hover { text-decoration: underline; }
+
+.hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--fg-subtle);
+  text-align: right;
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 自定义下拉 ── */
+
+.ui-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 8px;
+  text-align: left;
+  font: inherit;
+  font-size: 11.5px;
+  background-image: none;
+  cursor: pointer;
+}
+
+.ui-select-trigger:hover { color: var(--fg); }
+
+.ui-select-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-select-trigger::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 10px;
+  height: 6px;
+  background: var(--chevron) center / 10px 6px no-repeat;
+  transition: transform .2s var(--ease);
+}
+
+.ui-select-trigger[aria-expanded="true"]::after { transform: rotate(180deg); }
+
+.ui-select-panel {
+  position: fixed;
+  z-index: 9999;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 5px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .16), 0 0 0 1px var(--border);
+  font: 12.5px/1.5 var(--font);
+  color: var(--fg);
+}
+
+.ui-select-panel[hidden] { display: none; }
+
+.ui-select-item {
+  padding: 7px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-select-item:hover { background: var(--bg-muted); }
+
+.ui-select-item.is-selected {
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-soft);
+}
+
+/* 减少动效 */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}

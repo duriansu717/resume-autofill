@@ -1,0 +1,191 @@
+{
+  "basic": {
+    "name": "",
+    "nameEn": "",
+    "formerName": "",
+    "gender": "",
+    "birthday": "1998-07-15",
+    "age": "",
+    "idCard": "",
+    "idType": "身份证",
+    "nationality": "中国",
+    "ethnicity": "",
+    "birthPlace": "",
+    "hometown": "",
+    "hukou": "",
+    "politicalStatus": "群众",
+    "maritalStatus": "未婚",
+    "phone": "",
+    "phoneAlt": "",
+    "homePhone": "",
+    "email": "",
+    "emailAlt": "",
+    "schoolEmail": "",
+    "wechat": "",
+    "qq": "",
+    "website": "",
+    "addressProvince": "",
+    "city": "",
+    "addressDistrict": "",
+    "address": "",
+    "postalCode": "",
+    "height": "",
+    "weight": "",
+    "healthStatus": "良好",
+    "workYears": "",
+    "currentSalary": "",
+    "graduateYear": "",
+    "isFreshGraduate": "否",
+    "selfEvaluation": "",
+    "skills": "",
+    "hobbies": ""
+  },
+  "jobIntention": {
+    "position": "",
+    "city": "",
+    "salary": "",
+    "jobType": "全职",
+    "industry": "",
+    "companyType": "",
+    "positionLevel": "",
+    "jobStatus": "在职",
+    "availableFrom": "一个月内"
+  },
+  "educations": [
+    {
+      "school": "",
+      "schoolType": "",
+      "major": "",
+      "majorCategory": "",
+      "minorMajor": "",
+      "degree": "本科",
+      "isFullTime": "全日制",
+      "startDate": "2016-09",
+      "endDate": "2020-06",
+      "gpa": "",
+      "rank": "",
+      "city": "",
+      "lab": "",
+      "courses": "",
+      "honors": "",
+      "thesisTitle": "",
+      "description": ""
+    }
+  ],
+  "works": [
+    {
+      "company": "",
+      "companyType": "",
+      "companyScale": "",
+      "industry": "",
+      "department": "",
+      "position": "",
+      "employmentType": "全职",
+      "startDate": "2020-07",
+      "endDate": "2023-05",
+      "stillEmployed": "否",
+      "city": "",
+      "salary": "",
+      "reportingTo": "",
+      "subordinates": "",
+      "description": "",
+      "achievements": "",
+      "leaveReason": ""
+    }
+  ],
+  "internships": [
+    {
+      "company": "",
+      "department": "",
+      "position": "",
+      "startDate": "",
+      "endDate": "",
+      "city": "",
+      "description": ""
+    }
+  ],
+  "projects": [
+    {
+      "name": "",
+      "company": "",
+      "role": "",
+      "startDate": "",
+      "endDate": "",
+      "tech": "",
+      "teamSize": "",
+      "link": "",
+      "description": "",
+      "achievements": ""
+    }
+  ],
+  "campusExperiences": [
+    {
+      "organization": "",
+      "role": "",
+      "startDate": "",
+      "endDate": "",
+      "description": ""
+    }
+  ],
+  "trainings": [
+    {
+      "name": "",
+      "issuer": "",
+      "startDate": "",
+      "endDate": "",
+      "description": ""
+    }
+  ],
+  "certificates": [
+    {
+      "name": "",
+      "level": "",
+      "number": "",
+      "issuer": "",
+      "date": ""
+    }
+  ],
+  "languages": [
+    {
+      "name": "英语",
+      "level": "",
+      "score": ""
+    }
+  ],
+  "awards": [
+    {
+      "name": "",
+      "level": "",
+      "issuer": "",
+      "date": ""
+    }
+  ],
+  "competitions": [
+    {
+      "name": "",
+      "result": "",
+      "date": "",
+      "description": ""
+    }
+  ],
+  "studentCadreExperiences": [
+    {
+      "organization": "",
+      "role": "",
+      "startDate": "",
+      "endDate": "",
+      "description": ""
+    }
+  ],
+  "itSkills": [
+    {
+      "name": "",
+      "level": ""
+    }
+  ],
+  "emergency": {
+    "name": "",
+    "relation": "",
+    "phone": ""
+  }
+}

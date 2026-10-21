@@ -1,0 +1,230 @@
+{
+  "_说明": "这是一份填好的示例，用来参照格式。列出的都是虚构数据，绑定时请整体替换成你自己的。以下划线开头的键会被校验器忽略。",
+
+  "basic": {
+    "name": "张三",
+    "nameEn": "Zhang San",
+    "formerName": "",
+    "gender": "男",
+    "birthday": "1998-07-15",
+    "age": "",
+    "idCard": "",
+
+    "nationality": "中国",
+    "ethnicity": "汉族",
+    "birthPlace": "浙江省杭州市",
+    "hometown": "浙江省杭州市",
+    "hukou": "浙江省杭州市西湖区",
+    "politicalStatus": "共青团员",
+    "maritalStatus": "未婚",
+
+    "phone": "13800138000",
+    "phoneAlt": "",
+    "email": "zhangsan@example.com",
+    "emailAlt": "",
+    "wechat": "zhangsan_wx",
+    "qq": "",
+    "website": "https://github.com/example",
+
+    "addressProvince": "浙江省",
+    "city": "杭州市",
+    "addressDistrict": "西湖区",
+    "address": "文一西路 100 号 3 幢 501 室",
+    "postalCode": "310000",
+
+    "height": "175",
+    "weight": "68",
+    "healthStatus": "良好",
+
+    "workYears": "3",
+    "currentSalary": "20k",
+    "graduateYear": "2020",
+    "isFreshGraduate": "否",
+
+    "selfEvaluation": "三年后端开发经验，熟悉高并发场景下的服务设计与性能优化，有从零搭建订单系统的完整经历。",
+    "skills": "Java / Spring Boot / MySQL / Redis / Kafka / Docker / Kubernetes",
+    "hobbies": "长跑、开源项目"
+  },
+
+  "jobIntention": {
+    "position": "后端开发工程师",
+    "city": "杭州市",
+    "salary": "25-35K",
+    "jobType": "全职",
+    "industry": "互联网",
+    "companyType": "民营企业",
+    "positionLevel": "高级工程师",
+    "jobStatus": "在职，考虑机会",
+    "availableFrom": "一个月内"
+  },
+
+  "educations": [
+    {
+      "school": "某某大学",
+      "schoolType": "双一流",
+      "major": "计算机科学与技术",
+      "majorCategory": "计算机类",
+      "minorMajor": "",
+      "degree": "本科",
+      "isFullTime": "全日制",
+      "startDate": "2016-09",
+      "endDate": "2020-06",
+      "gpa": "3.6",
+      "rank": "5/120",
+      "city": "杭州市",
+      "courses": "数据结构、操作系统、计算机网络、数据库原理、编译原理",
+      "honors": "校级一等奖学金两次、优秀毕业生",
+      "thesisTitle": "基于分布式缓存的订单系统设计",
+      "description": "班级学习委员，ACM 校队成员。"
+    }
+  ],
+
+  "works": [
+    {
+      "company": "某某科技有限公司",
+      "companyType": "民营企业",
+      "companyScale": "1000-5000人",
+      "industry": "互联网",
+      "department": "交易平台部",
+      "position": "后端开发工程师",
+      "startDate": "2020-07",
+      "endDate": "2023-05",
+      "stillEmployed": "否",
+      "city": "杭州市",
+      "salary": "20K",
+      "reportingTo": "技术主管",
+      "subordinates": "2",
+      "description": "负责订单系统的重构与维护，支撑日均 200 万订单。",
+      "achievements": "主导订单库分库分表改造，P99 延迟从 800ms 降到 120ms；推动接口幂等方案落地，线上重复下单问题归零。",
+      "leaveReason": "寻求更大的技术挑战"
+    },
+    {
+      "company": "某某网络技术有限公司",
+      "companyType": "民营企业",
+      "companyScale": "100-500人",
+      "industry": "电子商务",
+      "department": "基础架构组",
+      "position": "后端开发工程师",
+      "startDate": "2023-06",
+      "endDate": "",
+      "stillEmployed": "是",
+      "city": "杭州市",
+      "salary": "25K",
+      "reportingTo": "架构师",
+      "subordinates": "0",
+      "description": "负责基础中间件与网关层的开发维护。",
+      "achievements": "搭建统一网关，接入 40+ 内部服务。",
+      "leaveReason": ""
+    }
+  ],
+
+  "internships": [
+    {
+      "company": "某某互联网公司",
+      "department": "搜索技术部",
+      "position": "后端开发实习生",
+      "startDate": "2019-07",
+      "endDate": "2019-09",
+      "city": "北京市",
+      "description": "参与搜索召回链路的日志采集与监控看板开发。"
+    }
+  ],
+
+  "projects": [
+    {
+      "name": "订单中心重构",
+      "company": "某某科技有限公司",
+      "role": "技术负责人",
+      "startDate": "2021-03",
+      "endDate": "2022-06",
+      "tech": "Java / Spring Boot / MySQL / ShardingSphere / Kafka / Redis",
+      "teamSize": "6",
+      "link": "",
+      "description": "把单体订单库拆分为按用户维度分片的分布式架构，覆盖下单、支付、履约、退款全链路。",
+      "achievements": "支撑日均订单从 50 万增长到 200 万，数据库单表行数从 4 亿降到 2000 万以内。"
+    },
+    {
+      "name": "统一网关平台",
+      "company": "某某网络技术有限公司",
+      "role": "核心开发",
+      "startDate": "2023-08",
+      "endDate": "2024-02",
+      "tech": "Java / Spring Cloud Gateway / Nacos / Prometheus",
+      "teamSize": "3",
+      "link": "",
+      "description": "内部统一 API 网关，提供鉴权、限流、灰度、链路追踪能力。",
+      "achievements": "接入 40+ 服务，线上故障定位时间从小时级降到分钟级。"
+    }
+  ],
+
+  "campusExperiences": [
+    {
+      "organization": "计算机学院 ACM 集训队",
+      "role": "队员",
+      "startDate": "2017-09",
+      "endDate": "2019-06",
+      "description": "参加省级程序设计竞赛，获团体二等奖。"
+    }
+  ],
+
+  "trainings": [
+    {
+      "name": "分布式系统设计进阶",
+      "issuer": "某某技术学院",
+      "startDate": "2022-03",
+      "endDate": "2022-05",
+      "description": "系统学习一致性协议、分布式事务与容灾设计。"
+    }
+  ],
+
+  "certificates": [
+    {
+      "name": "软件设计师",
+      "level": "中级",
+      "number": "",
+      "issuer": "工业和信息化部",
+      "date": "2021-11"
+    },
+    {
+      "name": "大学英语六级",
+      "level": "CET-6",
+      "number": "",
+      "issuer": "教育部考试中心",
+      "date": "2018-12"
+    }
+  ],
+
+  "languages": [
+    {
+      "name": "英语",
+      "level": "熟练（可读写技术文档，日常口语沟通）",
+      "score": "CET-6 530"
+    },
+    {
+      "name": "普通话",
+      "level": "二级甲等",
+      "score": ""
+    }
+  ],
+
+  "awards": [
+    {
+      "name": "校级一等奖学金",
+      "level": "校级",
+      "issuer": "某某大学",
+      "date": "2018-10"
+    },
+    {
+      "name": "年度技术创新奖",
+      "level": "公司级",
+      "issuer": "某某科技有限公司",
+      "date": "2022-01"
+    }
+  ],
+
+  "emergency": {
+    "name": "李四",
+    "relation": "配偶",
+    "phone": "13900139000"
+  }
+}

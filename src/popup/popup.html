@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>简历自动填写</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img class="mark" src="../../icons/icon48.png" alt="" width="30" height="30">
+    <div class="titles">
+      <h1>简历自动填写</h1>
+      <span id="version" class="ver"></span>
+    </div>
+    <select id="theme-select" class="theme-select" title="切换主题">
+      <option value="auto">跟随系统</option>
+      <option value="light">浅色</option>
+      <option value="dark">深色</option>
+    </select>
+  </header>
+
+  <section class="resume-bar">
+    <span class="resume-label">当前简历</span>
+    <select id="resume-select" class="resume-select" title="切换当前使用的简历"></select>
+  </section>
+
+  <section id="profile-summary" class="card"></section>
+
+  <section class="actions">
+    <button id="btn-panel" class="btn btn-primary">简历数据面板</button>
+  </section>
+
+  <section class="actions row">
+    <button id="btn-fill" class="btn">自动填充</button>
+    <button id="btn-scan" class="btn">仅预览匹配</button>
+  </section>
+
+  <p class="hintline">
+    打开数据面板 → 点「选取输入框」→ 点页面上的空框 → 点面板里对应的数据。
+    也可以直接点「复制」自己粘贴。
+  </p>
+
+  <section id="result" class="result" hidden></section>
+
+  <footer>
+    <a href="#" id="link-options">编辑简历数据</a>
+    <span id="hint" class="hint"></span>
+  </footer>
+
+  <script src="../shared/00-ns.js"></script>
+  <script src="../shared/normalize.js"></script>
+  <script src="../shared/fields.js"></script>
+  <script src="../shared/storage.js"></script>
+  <script src="../shared/select.js"></script>
+  <script src="../shared/dialog.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

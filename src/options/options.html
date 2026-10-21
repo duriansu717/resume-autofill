@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>简历自动填写 · 设置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="page">
+
+    <header class="topbar">
+      <img class="mark" src="../../icons/icon128.png" alt="" width="44" height="44">
+      <div class="titles">
+        <h1>简历数据</h1>
+        <p class="lead">
+          用表单逐项填写，或者直接编辑 JSON。填好后打开招聘网站的表单，点扩展图标即可使用。
+        </p>
+      </div>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab is-active" data-tab="form">简历填写</button>
+      <button class="tab" data-tab="json">JSON</button>
+      <button class="tab" data-tab="tpl">模板</button>
+    </nav>
+
+    <!-- ══════════ 简历填写 ══════════ -->
+    <section class="panel tabpanel" id="tab-form">
+
+      <div class="tplbar">
+        <span class="tplbar-label">简历</span>
+        <select id="resume-select" class="field tpl-select"></select>
+        <button id="btn-resume-new" class="btn btn-sm" title="选一个模板，新建一份简历">新建</button>
+        <button id="btn-resume-rename" class="btn btn-sm">重命名</button>
+        <button id="btn-resume-delete" class="btn btn-sm btn-del">删除</button>
+      </div>
+
+      <p id="resume-hint" class="resume-hint"></p>
+
+      <div class="toolbar">
+        <button id="btn-form-save" class="btn btn-primary">保存</button>
+        <span id="form-status" class="status"></span>
+      </div>
+
+      <div id="form-body"></div>
+    </section>
+
+    <!-- ══════════ JSON ══════════ -->
+    <section class="panel tabpanel" id="tab-json" hidden>
+      <p id="json-target" class="resume-hint"></p>
+
+      <div class="toolbar">
+        <button id="btn-template" class="btn" title="把这份简历的完整字段结构载入成空 JSON">载入空白 JSON</button>
+        <button id="btn-validate" class="btn">校验</button>
+        <button id="btn-save" class="btn btn-primary">保存</button>
+        <button id="btn-export" class="btn">导出</button>
+        <span id="status" class="status"></span>
+      </div>
+
+      <textarea id="json" spellcheck="false" placeholder='{
+  "basic": { "name": "张三", "phone": "13800138000" },
+  "educations": [ { "school": "某某大学", "major": "计算机" } ]
+}'></textarea>
+
+      <section id="issues" class="issues" hidden></section>
+
+      <div class="importer" id="importer">
+        <h2>从 AI 导入</h2>
+        <p class="note">
+          把简历（PDF / Word / 图片 / 纯文本）交给任意 AI，用下面的提示词让它输出 JSON，
+          再把结果粘回这里，或者直接选择 .json 文件。转换发生在你自己用的 AI 里，扩展不联网。
+        </p>
+
+        <div class="imp-actions">
+          <span class="imp-label">导入到</span>
+          <select id="imp-target" class="field imp-target"></select>
+          <button id="btn-copy-prompt" class="btn">复制提示词</button>
+          <label class="btn btn-file">
+            选择 .json 文件
+            <input type="file" id="file-json" accept=".json,application/json" hidden>
+          </label>
+          <span id="imp-status" class="status"></span>
+        </div>
+
+        <textarea id="import-text" class="imp-text" spellcheck="false"
+          placeholder="把 AI 输出的 JSON 粘贴到这里，然后点「识别」——代码块、前后说明、尾逗号都会自动清洗。"></textarea>
+
+        <div class="imp-actions">
+          <button id="btn-import-parse" class="btn btn-primary">识别</button>
+          <span class="imp-hint">也可以把 .json 文件直接拖到这块区域</span>
+        </div>
+
+        <div id="import-report" class="imp-report" hidden></div>
+
+        <p class="note imp-warn">
+          使用第三方 AI 时，身份证、手机号等信息会离开本机。介意的话，先把敏感字段删掉再交给它，或者换用本地模型。
+        </p>
+      </div>
+    </section>
+
+    <!-- ══════════ 模板 ══════════ -->
+    <section class="panel tabpanel" id="tab-tpl" hidden>
+      <div class="tplbar">
+        <span class="tplbar-label">模板</span>
+        <select id="tpl-select" class="field tpl-select"></select>
+        <button id="btn-tpl-new" class="btn btn-sm" title="复制当前模板，建一个新模板">新建</button>
+        <button id="btn-tpl-rename" class="btn btn-sm">重命名</button>
+        <button id="btn-tpl-delete" class="btn btn-sm btn-del">删除</button>
+      </div>
+
+      <p id="tpl-usage" class="note"></p>
+      <span id="tpl-status" class="status"></span>
+
+      <div id="tpl-body"></div>
+    </section>
+
+    <!-- ══════════ 设置 ══════════ -->
+    <section class="panel">
+      <h2>填充设置</h2>
+
+      <div class="settings">
+        <label class="row">
+          <span class="row-label">主题</span>
+          <select id="set-theme" class="field">
+            <option value="auto">跟随系统</option>
+            <option value="light">浅色</option>
+            <option value="dark">深色</option>
+          </select>
+        </label>
+
+        <label class="row">
+          <span class="row-label">低置信度字段</span>
+          <select id="set-low" class="field">
+            <option value="mark">照填，但标黄提醒我核对</option>
+            <option value="skip">不填，留空给我手动处理</option>
+          </select>
+        </label>
+
+        <label class="row">
+          <span class="row-label">自动新增经历条数上限</span>
+          <input id="set-maxadd" class="field field-num" type="number" min="0" max="10" step="1">
+        </label>
+
+        <label class="row">
+          <span class="row-label">调试模式</span>
+          <input id="set-debug" type="checkbox">
+        </label>
+      </div>
+
+      <p class="note">
+        调试模式会在浏览器控制台打印每个字段采集到的信号和匹配分数，用来排查误匹配。
+      </p>
+    </section>
+
+    <!-- ══════════ 备份与恢复 ══════════ -->
+    <section class="panel">
+      <h2>备份与恢复</h2>
+      <p class="note">
+        把全部模板、简历、数据和设置打包成一个 JSON 文件。
+        换电脑或换浏览器时，导入这个文件就能完整恢复，不用重新配置。
+      </p>
+      <div class="toolbar">
+        <button id="btn-backup-export" class="btn btn-primary">导出全部数据</button>
+        <label class="btn btn-file">
+          导入备份文件
+          <input type="file" id="file-backup" accept=".json,application/json" hidden>
+        </label>
+        <span id="backup-status" class="status"></span>
+      </div>
+    </section>
+
+    <!-- ══════════ 说明 ══════════ -->
+    <section class="panel">
+      <h2>关于模板与简历</h2>
+      <p class="note">
+        <b>模板</b>只描述结构：有哪些分组、每组哪些字段。系统自带一份<b>「通用模板」</b>，
+        含全部 135 个字段，不能删除，但字段可以随意增删。
+      </p>
+      <p class="note">
+        <b>简历</b>是具体的数据，创建时必须选一个模板。可以有多份，顶部下拉框切换的是整份简历——
+        按岗位准备几个版本，投哪个就切哪个。
+      </p>
+      <p class="note">
+        改动一个模板会<b>同时影响所有使用它的简历</b>，界面上会提示有几份在用；
+        还有简历在用时不能删除模板。删除简历会连同它的数据一起删掉（至少保留一份）。
+      </p>
+      <p class="note">
+        在「模板」标签页可以增删分组和字段、改自定义字段的名字。<b>改动立即生效</b>，
+        而且不会影响自动填充——匹配靠字段本身，不靠显示名。
+        删掉某个字段只是让它不在表单里出现，<b>已经填过的值不会丢</b>，加回来就能看到。
+      </p>
+
+      <h2>隐私</h2>
+      <p class="note">
+        所有数据只保存在本机浏览器里（<code>chrome.storage.local</code>），
+        扩展不联网、不上传任何内容。扩展也不会自动提交表单。
+      </p>
+    </section>
+
+  </div>
+
+  <!-- 新建简历 / 导入成新简历 -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card">
+      <h2 id="modal-title">新建简历</h2>
+      <label class="modal-row">
+        <span>简历名称</span>
+        <input id="modal-name" class="field" type="text" maxlength="40" placeholder="如：技术岗版">
+      </label>
+      <label class="modal-row">
+        <span>使用模板</span>
+        <select id="modal-tpl" class="field"></select>
+      </label>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn" type="button">取消</button>
+        <button id="modal-ok" class="btn btn-primary" type="button">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../shared/00-ns.js"></script>
+  <script src="../shared/normalize.js"></script>
+  <script src="../shared/fields.js"></script>
+  <script src="../shared/storage.js"></script>
+  <script src="../shared/importer.js"></script>
+  <script src="../shared/select.js"></script>
+  <script src="../shared/dialog.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
