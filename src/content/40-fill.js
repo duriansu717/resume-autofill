@@ -206,6 +206,10 @@
       硕士: ['硕士', '硕士研究生', '研究生', '硕士学位'],
       博士: ['博士', '博士研究生', '博士学位'],
     },
+    'educations.isFullTime': {
+      全日制: ['全日制', '统招', '全日制统招', '普通全日制', '脱产'],
+      非全日制: ['非全日制', '在职', '业余', '函授', '网络教育', '成人教育', '自考'],
+    },
     'basic.maritalStatus': {
       未婚: ['未婚', '单身'],
       已婚: ['已婚'],
@@ -228,9 +232,18 @@
     if (!v) return [];
     const table = VALUE_ALIASES[key];
     if (!table) return [v];
+
+    const norm = N.text(v);
+
+    // 先找完全相等的规范值。不能直接做包含判断——
+    // 「非全日制」包含「全日制」，先匹配到后者就会展开成错误的候选。
+    for (const canonical of Object.keys(table)) {
+      if (N.text(canonical) === norm) return table[canonical].concat([v]);
+    }
+
     for (const canonical of Object.keys(table)) {
       const variants = table[canonical];
-      if (variants.some((x) => N.text(x) === N.text(v) || N.text(v).includes(N.text(x)))) {
+      if (variants.some((x) => N.text(x) === norm || norm.includes(N.text(x)))) {
         return variants.concat([v]);
       }
     }
@@ -509,6 +522,20 @@
     return best;
   }
 
+  /** 失败时把弹层结构记下来，诊断报告里能直接看到它长什么样 */
+  function panelDebug(panel) {
+    if (!panel) return null;
+    const cls = String(panel.className && panel.className.baseVal != null
+      ? panel.className.baseVal : panel.className || '');
+    return {
+      tag: String(panel.tagName || '').toLowerCase(),
+      role: (panel.getAttribute && panel.getAttribute('role')) || '',
+      class: cls.slice(0, 120),
+      text: (panel.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 300),
+      html: String(panel.outerHTML || '').replace(/\s+/g, ' ').slice(0, 2500),
+    };
+  }
+
   /** 当前所有「看得见」的下拉面板 */
   function visibleDropdowns() {
     const out = [];
@@ -567,6 +594,22 @@
     return { best, score: bestScore };
   }
 
+  /** 点击一个元素：先滚动到可见区，再补 mousedown/mouseup，最后 click */
+  function clickEl(el) {
+    if (!el) return false;
+    try { el.scrollIntoView({ block: 'nearest' }); } catch (e) { /* 忽略 */ }
+    try {
+      el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    } catch (e) { /* 忽略 */ }
+    try {
+      el.click();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   function clickOptionIn(scope, variants) {
     if (!scope) return null;
 
@@ -585,18 +628,8 @@
     }
     if (!hit.best || hit.score < 0.6) return null;
 
-    const best = hit.best;
-    try { best.scrollIntoView({ block: 'nearest' }); } catch (e) { /* 忽略 */ }
-
-    // 不少组件把选中逻辑挂在 mousedown 上（为了抢在 blur 之前），
-    // 只派发 click 会被它们忽略。
-    try {
-      best.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-      best.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-    } catch (e) { /* 忽略 */ }
-
-    best.click();
-    return best;
+    clickEl(hit.best);
+    return hit.best;
   }
 
   /** 让下拉/日期弹层弹出来 */
@@ -694,7 +727,10 @@
         // 控件显示出来的可能是本地化文本（1998年07月15日），不能直接比对原字符串
         const shown = readDisplay(host);
         if (dateShown(shown, v) || sameish(shown, v)) {
-          return { ok: true, via: 'date-type', value: shown };
+          // shown === v 说明可能只是把我们打进去的原文留在框里，
+          // 组件未必真的接受了这个日期。本地化的显示才可信。
+          const localized = shown !== v;
+          return { ok: true, via: 'date-type', value: shown, localized };
         }
       }
     } finally {
@@ -849,6 +885,155 @@
     return any;
   }
 
+  // ─────────────────────── 年月选择器 ───────────────────────
+
+  const CN_MONTH = {
+    一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6,
+    七: 7, 八: 8, 九: 9, 十: 10, 十一: 11, 十二: 12,
+  };
+
+  function yearOfText(t) {
+    if (!/^(19|20)\d{2}\s*年?$/.test(t)) return 0;
+    return parseInt(t, 10) || 0;
+  }
+
+  function monthOfText(t) {
+    let m = /^(\d{1,2})\s*月$/.exec(t);
+    if (m) {
+      const n = +m[1];
+      return n >= 1 && n <= 12 ? n : 0;
+    }
+    m = /^([一二三四五六七八九十]{1,3})月$/.exec(t);
+    if (m) return CN_MONTH[m[1]] || 0;
+    return 0;
+  }
+
+  /** 面板里的年 / 月格子。文字必须「只有一个年份/月份」，排除整块容器 */
+  function dateCells(scope, kind) {
+    const out = [];
+    if (!scope) return out;
+    for (const el of scope.querySelectorAll('td, li, div, span, button, a')) {
+      if (!isVisible(el)) continue;
+
+      // 标题栏上的「2021年 / 7月」是切换视图的按钮，不是格子
+      const cls = String(el.className && el.className.baseVal != null
+        ? el.className.baseVal : el.className || '');
+      if (/header|year-btn|month-btn|picker-btn/i.test(cls)) continue;
+
+      const t = (el.textContent || '').trim();
+      if (!t || t.length > 8) continue;
+      const v = kind === 'year' ? yearOfText(t) : monthOfText(t);
+      if (!v) continue;
+      // 内含多个格子 / 交互控件的容器不要去点（标题栏常常就是这种）
+      if (el.querySelector && el.querySelector('td, li, [role="option"], .ant-picker-cell, button, a, input')) continue;
+
+      // 格子一般很小；标题栏整行都比较宽
+      try {
+        const r = el.getBoundingClientRect();
+        if (r.width > 170 || r.height > 70) continue;
+      } catch (e) { /* 忽略 */ }
+
+      out.push(kind === 'year' ? { el, year: v } : { el, month: v });
+    }
+    return out;
+  }
+
+  /** 年月选择器标题栏上的「当前年份」——点它一般会展开年份表格 */
+  function headerYearCell(scope) {
+    if (!scope) return null;
+    for (const el of scope.querySelectorAll('div, span, button, a, td')) {
+      if (!isVisible(el)) continue;
+      const t = (el.textContent || '').trim();
+      const y = yearOfText(t);
+      if (!y) continue;
+      // 只要真正承载文字的叶子节点，点外层容器不一定触发切换
+      if (el.children.length) continue;
+      try {
+        const r = el.getBoundingClientRect();
+        if (r.width > 170 || r.height > 70) continue;
+      } catch (e) { /* 忽略 */ }
+      return { el, year: y };
+    }
+    return null;
+  }
+
+  /**
+   * 年月选择器：面板是「年份表格 + 月份表格」，通用按选项文字匹配对不上
+   * （选项文字是「2021年」「7月」，简历里的值是「2021-07」）。
+   *
+   * 处理三种形态：
+   *   · 年份表格先出现（或年、月两列同时出现）→ 点年份，再点月份
+   *   · 直接是月份表格，标题上有当前年份 → 年份不对就点标题展开年份表格
+   *   · 找不到年份表格 → 放弃，交给后面的通用逻辑
+   */
+  async function pickYearMonth(panel, variants, host) {
+    const iso = variants.find((v) => /^\d{4}-\d{2}(-\d{2})?$/.test(v));
+    if (!iso) return null;
+
+    const year = +iso.slice(0, 4);
+    const month = +iso.slice(5, 7);
+    if (!year || !month) return null;
+
+    let p = panel;
+
+    // A. 年份表格已经可见：先选年（两列布局也走这里）。
+    //    至少 4 个年份才算表格——标题栏里的单个「2022年」不算。
+    const years = dateCells(p, 'year');
+    if (years.length >= 4) {
+      const yc = years.find((c) => c.year === year);
+      if (!yc) return null; // 目标年不在当前窗口，不做危险的翻页猜测
+      clickEl(yc.el);
+      await sleep(220);
+      p = livePanel(panel);
+      await waitFor(() => dateCells(p, 'month').length >= 6, 700);
+    }
+
+    // B. 月份格子
+    if (dateCells(p, 'month').length < 6) return null;
+
+    // 年份标题对不上：点标题展开年份表格，再点目标年
+    const hy = headerYearCell(p);
+    if (hy && hy.year !== year) {
+      clickEl(hy.el);
+      await sleep(220);
+      p = livePanel(panel);
+      await waitFor(() => dateCells(p, 'year').length >= 4, 700);
+
+      const yc = dateCells(p, 'year').find((c) => c.year === year);
+      if (!yc) return null;
+      clickEl(yc.el);
+      await sleep(220);
+      p = livePanel(panel);
+      await waitFor(() => dateCells(p, 'month').length >= 6, 700);
+    }
+
+    const mc = dateCells(p, 'month').find((c) => c.month === month);
+    if (!mc) return null;
+
+    clickEl(mc.el);
+    await sleep(200);
+
+    const after = readDisplay(host);
+    if (dateShown(after, iso) || sameish(after, iso)) {
+      return { ok: true, via: 'month-picker', value: after };
+    }
+    return null;
+  }
+
+  /** 面板是不是「日历日格」——有 20 个以上 1~31 的数字格子 */
+  function looksLikeDayGrid(scope) {
+    if (!scope) return false;
+    let n = 0;
+    for (const el of scope.querySelectorAll('td, div, span')) {
+      if (el.children.length) continue;
+      const t = (el.textContent || '').trim();
+      if (!/^\d{1,2}$/.test(t)) continue;
+      const v = +t;
+      if (v >= 1 && v <= 31 && ++n >= 20) return true;
+    }
+    return false;
+  }
+
   /**
    * 自定义组件填充。识别不出就放弃并如实报告——
    * 卡住整个流程比填不上一个字段糟糕得多。
@@ -876,10 +1061,18 @@
       isDateKey(key)
     );
 
+    // 打字成功但显示还是原文（没有变成「2021年09月」）时不可全信：
+    // 可能只是我们写进了输入框，组件并没有接住。继续走面板点年月，
+    // 面板路线也走不通时再退回打字结果。
+    let typed = null;
+    let openedByTyping = [];
     if (isDateWidget) {
+      const prePanels = visibleDropdowns();
       const r = await typeDate(host, dateInput, variants);
-      if (r && r.ok) return r;
-      // 打不进去就继续走弹层路径，看看能不能点格子
+      // 有些日期控件在输入时会顺手把面板弹出来，别再去点一下把它关掉
+      openedByTyping = visibleDropdowns().filter((p) => prePanels.indexOf(p) < 0);
+      if (r && r.ok && r.localized) return r;
+      if (r && r.ok) typed = r;
     }
 
     // 3) 通用：点开 → 等弹层
@@ -892,20 +1085,28 @@
     let trigger = null;
     let panel = null;
     try {
-      trigger = openWidget(host);
-      panel = await waitForPanel(watch, beforePanels, 700);
+      // 打字时已经弹出来的日期面板直接用，再点一次会把它收起来
+      if (openedByTyping.length) {
+        panel = pickPanel(openedByTyping);
+        trigger = dateInput || host;
+      } else {
+        trigger = openWidget(host);
+        panel = await waitForPanel(watch, beforePanels, 700);
 
-      // 3.0) 联想下拉：点开没反应，必须先输入关键字才会去远端搜索
-      //      （学校名称、公司名称最常见的就是这种）
-      //      日期控件上面已经试过打字了，不用再来一遍
-      if (!panel && !isDateWidget) {
-        panel = await typeToOpenPanel(host, variants, watch, beforePanels);
+        // 3.0) 联想下拉：点开没反应，必须先输入关键字才会去远端搜索
+        //      （学校名称、公司名称最常见的就是这种）
+        //      日期控件上面已经试过打字了，不用再来一遍
+        if (!panel && !isDateWidget) {
+          panel = await typeToOpenPanel(host, variants, watch, beforePanels);
+        }
       }
     } finally {
       watch.stop();
     }
 
     if (!panel) {
+      // 面板打不开但打字时把值放进去了，还是按打字结果走（由回读复查兜底）
+      if (typed) return typed;
       return { ok: false, reason: 'panel-not-opened' };
     }
 
@@ -924,8 +1125,36 @@
       const after = readDisplay(host);
       if (ok && after !== before) return { ok: true, via: 'cascader', value: after };
 
+      const dbg = panelDebug(panel);
       closePanel(trigger);
-      return { ok: false, reason: 'cascader-not-matched' };
+      return { ok: false, reason: 'cascader-not-matched', panel: dbg };
+    }
+
+    // 3.1b) 年月选择器：面板是年份/月份表格，按选项文字匹配对不上
+    if (isDateWidget) {
+      const ym = await pickYearMonth(panel, variants, host);
+      if (ym) return ym;
+
+      // 完整日历的日格子：不要退回「按选项文字点」。变体 2021-09-15 里含有
+      // "15"，会被当成日格子点下去——月份/年份没选对时这就是填错数据。
+      if (looksLikeDayGrid(panel)) {
+        // 如果打字时值已经写进去了，关掉日历再确认一次它没被清空
+        if (typed) {
+          closePanel(trigger);
+          try { if (trigger && trigger.blur) trigger.blur(); } catch (e) { /* 忽略 */ }
+          await sleep(180);
+          const shown = readDisplay(host);
+          if (shown && (sameish(shown, typed.value) || dateShown(shown, typed.value))) {
+            return typed;
+          }
+        }
+
+        const dbg = panelDebug(panel);
+        closePanel(trigger);
+        return { ok: false, reason: 'date-calendar-unhandled', panel: dbg };
+      }
+
+      if (typed) return typed; // 面板路线不通，退回打字结果
     }
 
     // 3.2) 普通下拉：先直接点，点不到再输入关键字过滤（可搜索下拉）
@@ -942,9 +1171,10 @@
     await sleep(120);
 
     if (!clicked) {
-      // 关掉弹层，免得挡住用户视线
+      // 关掉弹层，免得挡住用户视线；结构先记进诊断报告
+      const dbg = panelDebug(panel);
       closePanel(trigger);
-      return { ok: false, reason: 'option-not-found' };
+      return { ok: false, reason: 'option-not-found', panel: dbg };
     }
 
     // 组件更新显示值可能有延迟，别立刻下结论
@@ -1142,9 +1372,16 @@
             reason: r2.ok ? undefined : (r.reason || r2.reason),
             via: r2.ok ? (r2.via || 'native-fallback') : 'custom',
             written: primary,
+            panel: r.panel,
           };
         } else {
-          result = { ok: !!r.ok, reason: r.reason, via: r.via || 'custom', written: primary };
+          result = {
+            ok: !!r.ok,
+            reason: r.reason,
+            via: r.via || 'custom',
+            written: primary,
+            panel: r.panel,
+          };
         }
       } else {
         result = await fillTextInput(d.el, variants, primary, { maySuggest: mayAutocomplete(d) });
@@ -1168,6 +1405,18 @@
       }
 
       let now = readBack(d).trim();
+
+      // 日期控件显示的是「2021年09月」这类本地化文本，跟简历里的 2021-09
+      // 本来就不相等。这里绝不能走下面的「重试写入」——那会把控件刚转换好的
+      // 显示值又覆写成原文，等于把选中的日期冲掉。
+      if (isDateKey(d.raKey) && d.kind !== 'date-cluster') {
+        if (now && (sameish(now, primary) || dateShown(now, primary))) {
+          result.actual = now;
+          return result;
+        }
+        return { ok: false, reason: 'date-mismatch', written: '' };
+      }
+
       if (!sameish(now, primary) && d.kind !== 'select' && d.kind !== 'date-cluster') {
         // 重试一次
         await sleep(200);

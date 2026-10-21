@@ -19,11 +19,13 @@
 
   /** 日期类字段在经历块里共享的弱别名 */
   const DATE_START_GENERIC = [
-    '开始时间', '起始时间', '开始日期', '起始日期', '起止时间',
+    '开始时间', '起始时间', '开始日期', '起始日期', '起止时间', '起止日期',
     '开始', '起始', 'from', 'start', 'startdate', 'begindate', 'begin',
   ];
+  // 「起止时间」同时给 start 和 end：一个表单项里放两个日期控件、标签只写
+  // 「起止时间」的布局很常见，靠「一个槽位只能占一次」把第二个分给结束时间。
   const DATE_END_GENERIC = [
-    '结束时间', '终止时间', '结束日期', '终止日期', '截止时间',
+    '结束时间', '终止时间', '结束日期', '终止日期', '截止时间', '起止时间', '起止日期',
     '结束', '终止', '至', 'to', 'end', 'enddate', 'todate', 'finish',
   ];
 
@@ -511,9 +513,12 @@
     },
     {
       key: 'educations.isFullTime', section: 'education', label: '学习形式',
-      aliases: ['学习形式', '是否全日制', '培养方式', '就读形式'],
-      generic: ['studyform', 'fulltime'],
-      negative: [],
+      // 很多网申把「全日制 / 非全日制」写成「学历类型」「学历性质」，
+      // 它问的不是本科/硕士（那是 educations.degree），注意别搞反。
+      aliases: ['学习形式', '是否全日制', '培养方式', '就读形式',
+        '学历类型', '学历性质', '学习方式', '就读方式', '授课形式', '教育形式'],
+      generic: ['studyform', 'fulltime', 'studytype'],
+      negative: ['层次', '毕业院校'],
       ac: [],
       types: ['text', 'select', 'radio'],
     },

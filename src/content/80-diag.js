@@ -277,6 +277,14 @@
       actual: safeValue(key, a.actual),
       value: safeValue(key, a.raw),
       variants: isSensitive(key) ? [] : (a.variants || []).slice(0, 6).map((v) => trunc(v, 40)),
+      // 失败时弹层的结构：日期/下拉认不出来时，这一块是定位问题的关键
+      panel: a.panel ? {
+        tag: trunc(a.panel.tag, 20),
+        role: trunc(a.panel.role, 40),
+        class: trunc(a.panel.class, 120),
+        text: trunc(a.panel.text, 300),
+        html: trunc(a.panel.html, 2500),
+      } : undefined,
     };
   }
 

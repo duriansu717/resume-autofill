@@ -446,7 +446,8 @@ el.dispatchEvent(new InputEvent('input', { bubbles: true }));
 - 页面地址（**已去掉 query / hash**）、标题、是否在 iframe 里、视口与缩放
 - 每个被扫描到的控件：标签、label 来源、placeholder、name、id、type、区块，以及匹配到的字段与分数
 - 没识别出来的控件：最接近的 3 个候选字段、分数与命中的证据
-- 失败字段的失败原因（`panel-not-opened` / `option-not-found` / `value-reverted` …）和控件、表单项容器的 DOM 片段
+- 失败字段的失败原因（`panel-not-opened` / `option-not-found` / `value-reverted` / `date-mismatch` …）和控件、表单项容器的 DOM 片段
+- 失败时下拉 / 日期弹层的结构（类名、文字、HTML），专门用来定位认不出来的控件
 - **隐私自动隐藏**：姓名、手机号、邮箱、身份证、地址、生日、QQ/微信、自定义字段的值一律显示为「（已隐藏）」；DOM 片段里的脚本、样式和所有输入值也会被清掉
 
 有了这些，就能直接判断是「扫描阶段没看到控件」「匹配阶段分数不够 / 槽位被占」还是「填充阶段写不进去」，不需要再靠猜。

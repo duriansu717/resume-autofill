@@ -306,6 +306,40 @@ check('学历下拉被识别为学历', () => {
   assertEq(topKeyName(d), 'educations.degree');
 });
 
+check('同一个「起止时间」标签下的两个日期控件，分别归到入学 / 毕业时间', () => {
+  // 网申常见布局：一个表单项里放两个日期控件，标签只写「起止时间」。
+  // 两个控件的标签完全一样，只能靠「一个槽位只能占一次」的全局分配来区分。
+  const section = { key: 'education', entryIndex: 0 };
+  const a = mk({ labelText: '起止时间', labelSource: 'container' }, section);
+  const b = mk({ labelText: '起止时间', labelSource: 'container' }, section);
+
+  const matches = RA.score.match([a, b]);
+  const keys = matches.filter((m) => m.d === a || m.d === b).map((m) => m.key);
+
+  if (!keys.includes('educations.startDate') || !keys.includes('educations.endDate')) {
+    throw new Error('两个日期控件应该分别拿到入学/毕业时间，实际：' + keys.join(', '));
+  }
+});
+
+check('「学历类型」是学习形式，不是学历层次', () => {
+  // 网申里常见的坑：「学历」问本科/硕士，「学历类型」问全日制/非全日制。
+  // 早先 degree 把「学历类型」写成负别名，却没有字段接住它，结果谁也填不上。
+  const d = mk({
+    kind: 'select',
+    labelText: '学历类型',
+    labelSource: 'for',
+    optionTexts: ['全日制', '非全日制'],
+  });
+  assertEq(topKeyName(d), 'educations.isFullTime');
+  assert(scoreOf(d, 'educations.isFullTime') > scoreOf(d, 'educations.degree'),
+    '学习形式的分数应该高于学历');
+});
+
+check('只有「全日制 / 非全日制」选项的下拉被识别为学习形式', () => {
+  const d = mk({ kind: 'select', optionTexts: ['全日制', '非全日制'], name: 'f_99' });
+  assertEq(topKeyName(d), 'educations.isFullTime');
+});
+
 check('婚否选项被识别为婚姻状况', () => {
   const d = mk({ kind: 'select', optionTexts: ['未婚', '已婚', '离异'] });
   assertEq(topKeyName(d), 'basic.maritalStatus');

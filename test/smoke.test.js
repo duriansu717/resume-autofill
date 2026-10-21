@@ -423,6 +423,21 @@ check('「大学本科」能匹配到简历里的「本科」', () => {
   if (sel.value !== '2') throw new Error(`选错了：${sel.value}`);
 });
 
+check('「全日制统招」能匹配到简历里的「全日制」', () => {
+  const sel = mkSelect([['', '请选择'], ['1', '全日制统招'], ['2', '非全日制']]);
+  if (!RA.fill.selectByText(sel, RA.fill.valueVariants('educations.isFullTime', '全日制'))) {
+    throw new Error('应该匹配上');
+  }
+  if (sel.value !== '1') throw new Error(`选错了：${sel.value}`);
+});
+
+check('在职 / 业余这些写法归到非全日制', () => {
+  const v = RA.fill.valueVariants('educations.isFullTime', '非全日制');
+  if (!v.includes('在职') || !v.includes('函授')) {
+    throw new Error('非全日制的常见写法没展开：' + v.join(' / '));
+  }
+});
+
 check('value="0" 是合法选项，不能被当成占位符', () => {
   // 早先的实现把 value="0" 一律当占位，会误伤「0 年经验」「0 次」这类选项
   const sel = mkSelect([['-1', '请选择'], ['0', '0年'], ['1', '1年']]);

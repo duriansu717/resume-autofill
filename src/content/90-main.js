@@ -265,6 +265,7 @@
           RA.diag.recordAttempt({
             d, key: m.key, label, tier: m.tier, score: m.score, raw, variants,
             ok: res.ok, reason: res.reason, via: res.via, actual: res.actual,
+            panel: res.panel,
           });
         }
       } catch (e) { /* 诊断失败不能影响填充 */ }
@@ -415,7 +416,8 @@
       if (RA.diag) {
         RA.diag.recordAttempt({
           d, key, label, tier: 'manual', score: null, raw, variants,
-          ok: res.ok, reason: res.reason, via: res.via, actual: res.actual, manual: true,
+          ok: res.ok, reason: res.reason, via: res.via, actual: res.actual,
+          panel: res.panel, manual: true,
         });
       }
     } catch (e) { /* 诊断失败不能影响填充 */ }
