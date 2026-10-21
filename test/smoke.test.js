@@ -989,6 +989,76 @@ check('日期字段靠 key 就能认出来', () => {
   if (RA.fill.isDateKey('jobIntention.availableFrom')) throw new Error('到岗时间不该当日期');
 });
 
+// ─────────── 联想输入（学校 / 公司名称） ───────────
+
+console.log('\n\x1b[1m联想输入识别\x1b[0m');
+
+function fakeInput(attrs) {
+  return {
+    readOnly: true,
+    disabled: false,
+    getAttribute(k) {
+      return Object.prototype.hasOwnProperty.call(attrs, k) ? attrs[k] : null;
+    },
+    hasAttribute(k) {
+      return Object.prototype.hasOwnProperty.call(attrs, k);
+    },
+    closest() { return null; },
+    matches() { return false; },
+    getBoundingClientRect() { return { width: 200, height: 32 }; },
+  };
+}
+
+check('readonly 但带「请选择学校」提示的框不会被当成只读计算字段跳过', () => {
+  // 学校/公司这类选择器经常没有约定类名，只有 readonly + 提示语。
+  // 以前一律按 readonly 跳过，表现就是「这个字段根本检测不到」。
+  if (RA.scan.shouldSkip(fakeInput({ placeholder: '请选择学校' }))) {
+    throw new Error('应该放行');
+  }
+  if (RA.scan.shouldSkip(fakeInput({ 'aria-autocomplete': 'list' }))) {
+    throw new Error('aria-autocomplete 应该放行');
+  }
+  if (!RA.scan.shouldSkip(fakeInput({ placeholder: '系统自动计算' }))) {
+    throw new Error('没有选择器特征的 readonly 仍然应该跳过');
+  }
+});
+
+check('标签是简历字段的可搜索下拉，不会被当成站点搜索框丢掉', () => {
+  // placeholder 写「请输入关键字搜索」在可搜索下拉里非常常见，
+  // 但它的标签是「专业」「学校名称」，是正经表单字段。
+  // 早先按 placeholder 一律当搜索框丢弃，这类字段直接「检测不到」。
+  const sig = (labelText, placeholder) => ({ labelText, placeholder, name: '', id: '' });
+
+  if (RA.scan.isJunk(sig('专业', '请输入关键字搜索'))) {
+    throw new Error('「专业」可搜索下拉被误删');
+  }
+  if (RA.scan.isJunk(sig('学校名称', '搜索学校名称'))) {
+    throw new Error('「学校名称」可搜索下拉被误删');
+  }
+  if (!RA.scan.isJunk(sig('搜索', '搜索职位'))) {
+    throw new Error('站点搜索框应该被丢弃');
+  }
+  if (!RA.scan.isJunk(sig('验证码', '请输入验证码'))) {
+    throw new Error('验证码应该被丢弃');
+  }
+});
+
+check('学校 / 公司 / 专业被识别为可能有联想列表的字段', () => {
+  const el = { getAttribute: () => null };
+  const mk = (key, signals) => ({ raKey: key, el, signals: signals || {} });
+
+  if (!RA.fill.mayAutocomplete(mk('educations.school'))) throw new Error('学校应该识别');
+  if (!RA.fill.mayAutocomplete(mk('works.company'))) throw new Error('公司应该识别');
+  if (!RA.fill.mayAutocomplete(mk('educations.major'))) throw new Error('专业应该识别');
+
+  if (RA.fill.mayAutocomplete(mk('basic.name'))) throw new Error('姓名不该识别');
+  if (RA.fill.mayAutocomplete(mk('basic.phone'))) throw new Error('电话不该识别');
+
+  if (!RA.fill.mayAutocomplete(mk('basic.city', { placeholder: '请输入学校名称' }))) {
+    throw new Error('提示语指向学校时应该识别');
+  }
+});
+
 // ─────────── 悬浮按钮的出现条件 ───────────
 
 function fakeField(attrs) {

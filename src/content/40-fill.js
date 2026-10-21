@@ -380,24 +380,175 @@
     '.ivu-select-item, .ant-cascader-menu-item, .el-cascader-node, ' +
     '.ant-picker-cell, .el-date-table td, li[class*="option"]';
 
-  function clickOptionIn(scope, variants) {
-    const items = Array.from(scope.querySelectorAll(OPTION_SEL)).filter((it) => {
-      const t = (it.textContent || '').trim();
-      return t && t.length <= 40;
-    });
+  /** 面板选择器。很多组件把弹层挂到 body 上，类名五花八门，能列的都列上 */
+  const PANEL_SEL = [
+    '[role="listbox"]', '[role="menu"]', '[role="tree"]',
+    '.ant-select-dropdown', '.ant-picker-panel', '.ant-cascader-dropdown',
+    '.el-select-dropdown', '.el-cascader-panel', '.el-autocomplete-suggestion',
+    '.ivu-select-dropdown', '.ivu-picker-panel',
+    '.arco-select-popup', '.arco-cascader-popup', '.arco-picker-container',
+    '.semi-select-option-list', '.semi-portal', '.n-select-menu',
+    '.v-binder-follower-content', '.t-select__dropdown', '.t-cascader__panel',
+    '.select2-results', '.select2-drop', '.chosen-drop', '.selectize-dropdown',
+    '[data-popper-placement]',
+    '[class*="dropdown"]', '[class*="popup"]', '[class*="popper"]',
+    '[class*="suggest"]', '[class*="autocomplete"]', '[class*="option-list"]',
+    '[class*="options-panel"]', '[class*="select-panel"]', '[class*="picker-panel"]',
+  ].join(', ');
 
-    // 兜底：有些组件的选项没有任何 role / 约定类名，只是一串 div / li / span。
-    // 找「叶子节点」——文字在它这里结束，点击会冒泡到真正挂事件的父节点。
-    if (!items.length) {
-      for (const el of scope.querySelectorAll('div, li, span, td, a')) {
-        if (el.children.length) continue;
-        const t = (el.textContent || '').trim();
-        if (t && t.length <= 40) items.push(el);
+  function isVisible(el) {
+    if (!el || !el.getClientRects().length) return false;
+    const cs = getComputedStyle(el);
+    return cs.display !== 'none' && cs.visibility !== 'hidden' && cs.opacity !== '0';
+  }
+
+  /** 元素里有没有「一行一个」的短文本——下拉选项、建议列表都长这样 */
+  function hasShortText(el) {
+    if (!el) return false;
+    for (const node of el.querySelectorAll('div, li, span, td, a')) {
+      if (node.children.length) continue;
+      const t = (node.textContent || '').trim();
+      if (t && t.length <= 40) return true;
+    }
+    return false;
+  }
+
+  /**
+   * 没挂约定类名的弹层长什么样：飘在页面上（absolute/fixed）、有尺寸、
+   * 里面是一行行短文本。靠这个兜住自研的联想下拉。
+   */
+  function isPopupLike(el) {
+    if (!el || el.nodeType !== 1) return false;
+    if (el.closest('[data-ra-ignore]')) return false;
+    if (!isVisible(el)) return false;
+
+    const role = (el.getAttribute('role') || '').toLowerCase();
+    const cs = getComputedStyle(el);
+    const floating = cs.position === 'absolute' || cs.position === 'fixed';
+    if (!floating && role !== 'listbox' && role !== 'menu' && role !== 'tree') return false;
+
+    const r = el.getBoundingClientRect();
+    if (r.width < 40 || r.height < 16) return false;
+    if (r.height > 1400) return false;
+
+    return hasShortText(el);
+  }
+
+  /**
+   * 把一个新插入 DOM 的节点展开成「可能的弹层」。
+   * 组件通常先插一个 portal 容器，弹层在它里面，所以容器本身不合适时往下找一层。
+   */
+  function popupRoots(nodes, limit = 300) {
+    const out = [];
+    for (const n of nodes) {
+      if (!n || n.nodeType !== 1) continue;
+
+      let best = null;
+      const scan = [n].concat(Array.from(n.querySelectorAll('*')).slice(0, limit));
+      for (const el of scan) {
+        if (isPopupLike(el)) { best = el; break; } // 外层优先，范围更大
       }
+      if (best) out.push(best);
+    }
+    return out;
+  }
+
+  /** 新插入节点的观察器：自研弹层没有稳定类名，只能看「点了之后新出现了什么」 */
+  function startPanelWatch() {
+    const added = [];
+    let obs = null;
+    try {
+      obs = new MutationObserver((muts) => {
+        for (const m of muts) {
+          for (const n of m.addedNodes) {
+            if (n.nodeType === 1) added.push(n);
+          }
+        }
+        // 页面在填表时可能还在刷列表 / 广告，别让数组无限长
+        if (added.length > 200) added.splice(0, added.length - 200);
+      });
+      obs.observe(document.body, { childList: true, subtree: true });
+    } catch (e) { /* 没有 body 之类，忽略 */ }
+
+    return {
+      take() {
+        const fresh = popupRoots(added.splice(0, added.length));
+        const vis = visibleDropdowns();
+        return fresh.concat(vis);
+      },
+      stop() { if (obs) obs.disconnect(); },
+    };
+  }
+
+  /** 两个面板里谁的「选项感」更强——toast / tooltip 也会被当成弹层，得挑对 */
+  function panelScore(el) {
+    if (!el) return 0;
+    const role = (el.getAttribute('role') || '').toLowerCase();
+    let s = 0;
+    if (role === 'listbox' || role === 'menu' || role === 'tree') s += 10;
+    if (el.matches && el.matches(PANEL_SEL)) s += 3;
+    s += Math.min(el.querySelectorAll(OPTION_SEL).length, 20);
+
+    let leaves = 0;
+    for (const node of el.querySelectorAll('div, li, span, td, a')) {
+      if (node.children.length) continue;
+      const t = (node.textContent || '').trim();
+      if (t && t.length <= 40 && ++leaves >= 20) break;
+    }
+    return s + Math.min(leaves, 20);
+  }
+
+  function pickPanel(list) {
+    let best = null;
+    let bestScore = 0;
+    for (const p of list) {
+      if (!p || !p.isConnected || !isVisible(p)) continue;
+      const s = panelScore(p);
+      if (s > bestScore) { bestScore = s; best = p; }
+    }
+    return best;
+  }
+
+  /** 当前所有「看得见」的下拉面板 */
+  function visibleDropdowns() {
+    const out = [];
+    for (const p of document.querySelectorAll(PANEL_SEL)) {
+      if (isVisible(p)) out.push(p);
+    }
+    return out;
+  }
+
+  /** 面板里的选项元素：先认约定标记，再兜底到叶子文本节点 */
+  function optionElements(scope) {
+    if (!scope) return [];
+
+    const standard = [];
+    for (const it of scope.querySelectorAll(OPTION_SEL)) {
+      const t = (it.textContent || '').trim();
+      if (t && t.length <= 40) standard.push(it);
     }
 
-    if (!items.length) return null;
+    const leaves = [];
+    for (const el of scope.querySelectorAll('div, li, span, td, a')) {
+      if (el.children.length) continue;
+      const t = (el.textContent || '').trim();
+      if (!t || t.length > 40) continue;
+      let covered = false;
+      for (const s of standard) {
+        if (s === el || s.contains(el)) { covered = true; break; }
+      }
+      if (!covered) leaves.push(el);
+    }
 
+    return standard.concat(leaves);
+  }
+
+  /** 面板里是否已经有选项了（异步加载时用得着） */
+  function hasOptions(panel) {
+    return !!(panel && optionElements(panel).length);
+  }
+
+  function bestOption(items, variants) {
     let best = null;
     let bestScore = 0;
     for (const target of variants) {
@@ -413,8 +564,28 @@
         if (s > bestScore) { bestScore = s; best = it; }
       }
     }
-    if (!best || bestScore < 0.6) return null;
+    return { best, score: bestScore };
+  }
 
+  function clickOptionIn(scope, variants) {
+    if (!scope) return null;
+
+    const standard = Array.from(scope.querySelectorAll(OPTION_SEL)).filter((it) => {
+      const t = (it.textContent || '').trim();
+      return t && t.length <= 40;
+    });
+
+    let hit = bestOption(standard, variants);
+    if (!hit.best || hit.score < 0.6) {
+      // 有些组件的选项没有任何 role / 约定类名，只是一串 div / li / span。
+      // 找「叶子节点」——文字在它这里结束，点击会冒泡到真正挂事件的父节点。
+      const leaves = optionElements(scope).filter((el) => !standard.includes(el));
+      const fallback = bestOption(leaves, variants);
+      if (fallback.best && fallback.score > hit.score) hit = fallback;
+    }
+    if (!hit.best || hit.score < 0.6) return null;
+
+    const best = hit.best;
     try { best.scrollIntoView({ block: 'nearest' }); } catch (e) { /* 忽略 */ }
 
     // 不少组件把选中逻辑挂在 mousedown 上（为了抢在 blur 之前），
@@ -428,38 +599,50 @@
     return best;
   }
 
-  /** 当前所有「看得见」的下拉面板 */
-  function visibleDropdowns() {
-    const sel = '[role="listbox"], [role="menu"], ' +
-      '.ant-select-dropdown:not(.ant-select-dropdown-hidden), ' +
-      '.el-select-dropdown, .ivu-select-dropdown, .ant-picker-panel, ' +
-      '.ant-cascader-dropdown, .el-cascader-panel, [class*="dropdown"]';
-
-    const out = [];
-    for (const p of document.querySelectorAll(sel)) {
-      const cs = getComputedStyle(p);
-      if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') continue;
-      if (!p.getClientRects().length) continue; // 没有尺寸的占位元素
-      out.push(p);
-    }
-    return out;
-  }
-
   /** 让下拉/日期弹层弹出来 */
   function openWidget(host) {
     const trigger = host.querySelector(
-      '[role="combobox"], [aria-haspopup="listbox"], .ant-select-selector, ' +
-      '.el-input__inner, .ivu-select-selection, .ant-picker, .el-range-input'
+      '[role="combobox"], [aria-haspopup="listbox"], [aria-autocomplete], ' +
+      '.ant-select-selector, .el-input__inner, .ivu-select-selection, ' +
+      '.ant-picker, .el-range-input, input'
     ) || host;
-    // 有些实现监听 mousedown 而不是 click
+
+    // 有些实现监听 pointerdown / mousedown 而不是 click；只派发 click 会被忽略
     try {
       trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      trigger.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
     } catch (e) { /* 忽略 */ }
+
+    if (typeof trigger.focus === 'function') {
+      try { trigger.focus({ preventScroll: true }); } catch (e) { trigger.focus(); }
+    }
+
     try {
       trigger.click();
     } catch (e) { /* 忽略 */ }
-    if (typeof trigger.focus === 'function') trigger.focus();
+
+    // 部分组件只在键盘事件里展开
+    try {
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', keyCode: 40, bubbles: true }));
+    } catch (e) { /* 忽略 */ }
+
     return trigger;
+  }
+
+  /** 等到一个「点开之后新出现」的面板 */
+  async function waitForPanel(watch, before, timeout) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+      const fresh = watch.take().filter((p) => before.indexOf(p) < 0);
+      const pick = pickPanel(fresh);
+      if (pick) {
+        // 刚插进来的面板可能是空的，稍等它把选项渲染出来
+        await waitFor(() => hasOptions(pick), 450);
+        return pick;
+      }
+      await sleep(60);
+    }
+    return null;
   }
 
   /** 这些字段的值是日期：控件不一定带 date 类名，靠 key 判断更稳 */
@@ -523,13 +706,18 @@
 
   /** 弹层/控件里找一个能打字的输入框（可搜索下拉的搜索框） */
   function findTypeableInput(host, panel) {
+    // readonly 的输入框也可能是搜索框（点开之后才让你打字），调用方会临时摘掉 readonly
+    const usable = (inp) => {
+      const t = (inp.getAttribute('type') || 'text').toLowerCase();
+      if (t !== 'text' && t !== 'search') return false;
+      return !inp.disabled;
+    };
     const pick = (root) => {
       if (!root || !root.querySelectorAll) return null;
+      // 控件本身就是 input 时，querySelectorAll 是找不到自己的
+      if (root.matches && root.matches('input') && usable(root)) return root;
       for (const inp of root.querySelectorAll('input')) {
-        const t = (inp.getAttribute('type') || 'text').toLowerCase();
-        if (t !== 'text' && t !== 'search') continue;
-        if (inp.readOnly || inp.disabled) continue;
-        return inp;
+        if (usable(inp)) return inp;
       }
       return null;
     };
@@ -539,7 +727,7 @@
 
   function optionTexts(panel) {
     if (!panel) return [];
-    return Array.from(panel.querySelectorAll(OPTION_SEL))
+    return optionElements(panel)
       .slice(0, 30)
       .map((it) => (it.textContent || '').trim());
   }
@@ -552,21 +740,19 @@
 
   /** 面板可能被组件重渲染成新节点，用之前重新确认一下 */
   function livePanel(panel) {
-    if (panel && panel.isConnected) {
-      const cs = getComputedStyle(panel);
-      if (cs.display !== 'none' && cs.visibility !== 'hidden') return panel;
-    }
-    const vis = visibleDropdowns();
-    return vis.length ? vis[vis.length - 1] : panel;
+    if (panel && panel.isConnected && isVisible(panel)) return panel;
+    return pickPanel(visibleDropdowns()) || panel;
   }
 
   /**
-   * 可搜索的下拉：列表是虚拟滚动的，不输入就找不到目标项。
+   * 可搜索的下拉：列表是虚拟滚动的/远端的，不输入就找不到目标项。
    * 往搜索框里打关键字，等列表过滤之后再点。
    *
-   * 两个细节：
+   * 关键细节：
+   *   · 远端搜索普遍有 300ms 以上的防抖，输入后立刻点只会点到旧列表——
+   *     必须轮询等「列表真的变了」再去点，不能睡 180ms 就下结论
    *   · 输入之后组件可能把面板整个换成新节点，所以点之前重新取一次
-   *   · 列表完全没变化说明这个输入框不是搜索框，别再打了
+   *   · 列表始终没变化说明这个输入框不是搜索框，别再打了
    *   · 失败时把输入框恢复原样，不能直接清空——有的组件里它就是显示值
    */
   async function typeToFilter(host, panel, variants) {
@@ -575,26 +761,73 @@
 
     const original = input.value;
     const beforeTexts = optionTexts(panel);
+    const restore = unwrapReadonly(input);
 
-    for (const v of variants) {
-      if (!v) continue;
-      const probe = v.length > 8 ? v.slice(0, 8) : v;
-      try { setNativeValue(input, probe); } catch (e) { continue; }
+    try {
+      for (const v of variants) {
+        if (!v) continue;
+        const probe = v.length > 8 ? v.slice(0, 8) : v;
+        try { setNativeValue(input, probe); } catch (e) { continue; }
 
-      try {
-        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', keyCode: 40, bubbles: true }));
-      } catch (e) { /* 忽略 */ }
+        try {
+          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', keyCode: 40, bubbles: true }));
+        } catch (e) { /* 忽略 */ }
 
-      await sleep(180);
+        const changed = await waitFor(() => {
+          const fresh = livePanel(panel);
+          const opts = optionTexts(fresh);
+          if (opts.length && !sameTexts(beforeTexts, opts)) return fresh;
+          return null;
+        }, 1200);
 
-      const fresh = livePanel(panel);
-      if (clickOptionIn(fresh, variants)) return true;
+        if (clickOptionIn(changed || livePanel(panel), variants)) return true;
 
-      if (sameTexts(beforeTexts, optionTexts(fresh))) break;
+        if (!changed) break; // 列表一直没变，这不是搜索框
+      }
+
+      try { setNativeValue(input, original); } catch (e) { /* 忽略 */ }
+      return false;
+    } finally {
+      restore();
+    }
+  }
+
+  /**
+   * 点开没反应时的第二条路：先输入关键字，把联想列表「搜」出来。
+   * 学校名称、公司名称这类远端联想输入只有输入之后才会出现候选。
+   */
+  async function typeToOpenPanel(host, variants, watch, beforePanels) {
+    const input = findTypeableInput(host, null);
+    if (!input) return null;
+
+    const original = input.value;
+    const restore = unwrapReadonly(input);
+
+    let found = null;
+    try {
+      for (const v of variants) {
+        if (!v) continue;
+        const probe = v.length > 10 ? v.slice(0, 10) : v;
+        try { setNativeValue(input, probe); } catch (e) { continue; }
+
+        // 有的组件监听 keyup 才发请求
+        try {
+          input.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
+        } catch (e) { /* 忽略 */ }
+
+        found = await waitForPanel(watch, beforePanels, 1000);
+        if (found) break;
+      }
+    } finally {
+      restore();
     }
 
-    try { setNativeValue(input, original); } catch (e) { /* 忽略 */ }
-    return false;
+    if (!found) {
+      // 没搜出来就还原，别把用户原来选中的内容抹掉
+      try { setNativeValue(input, original); } catch (e) { /* 忽略 */ }
+    }
+
+    return found;
   }
 
   /** 级联面板（省 → 市 → 区）：逐列点，点完一列下一列才会出现 */
@@ -636,7 +869,8 @@
     }
 
     // 2) 日期类控件优先「打字」而不是「点日历格子」——点格子依赖本地化和虚拟滚动，太脆
-    const dateInput = host.querySelector('input');
+    const dateInput = host.querySelector('input') ||
+      (host.matches && host.matches('input') ? host : null);
     const isDateWidget = dateInput && (
       /(ant-picker|el-date-editor|date)/i.test(host.className + ' ' + dateInput.className) ||
       isDateKey(key)
@@ -651,25 +885,32 @@
     // 3) 通用：点开 → 等弹层
     // 先记下点开之前已经开着的面板，等下优先挑「新出现」的那个。
     // 页面上同时挂着好几个下拉时，取第一个会点错地方。
+    // 自研的弹层没有稳定类名，所以同时观察「点了之后新插入了什么」。
     const beforePanels = visibleDropdowns();
-    const trigger = openWidget(host);
+    const watch = startPanelWatch();
 
-    const panel = await waitFor(() => {
-      const vis = visibleDropdowns();
-      if (!vis.length) return null;
+    let trigger = null;
+    let panel = null;
+    try {
+      trigger = openWidget(host);
+      panel = await waitForPanel(watch, beforePanels, 700);
 
-      for (let i = vis.length - 1; i >= 0; i--) {
-        if (beforePanels.indexOf(vis[i]) < 0) return vis[i];
+      // 3.0) 联想下拉：点开没反应，必须先输入关键字才会去远端搜索
+      //      （学校名称、公司名称最常见的就是这种）
+      //      日期控件上面已经试过打字了，不用再来一遍
+      if (!panel && !isDateWidget) {
+        panel = await typeToOpenPanel(host, variants, watch, beforePanels);
       }
-      return vis[vis.length - 1];
-    }, 700);
+    } finally {
+      watch.stop();
+    }
 
     if (!panel) {
       return { ok: false, reason: 'panel-not-opened' };
     }
 
     // 面板出现 ≠ 选项渲染完了——很多站点的选项是异步拉取的
-    await waitFor(() => panel.querySelector(OPTION_SEL) || null, 800);
+    await waitFor(() => hasOptions(panel), 800);
 
     // 3.1) 省市区级联树：面板里是多列，按 省 → 市 → 区 逐列点
     const isCascader = /cascader/i.test(String(panel.className || '')) ||
@@ -706,12 +947,20 @@
       return { ok: false, reason: 'option-not-found' };
     }
 
-    const after = readDisplay(host);
-    return { ok: after !== before, via: 'click-recipe', value: after };
+    // 组件更新显示值可能有延迟，别立刻下结论
+    const after = (await waitFor(() => {
+      const v = readDisplay(host);
+      return v && v !== before ? v : null;
+    }, 500)) || readDisplay(host);
+
+    return { ok: true, via: 'click-recipe', value: after };
   }
 
   /** 读自定义组件当前显示的文字 */
   function readDisplay(host) {
+    if (!host) return '';
+    // host 本身可能就是那个 input（比如带 aria-autocomplete 的联想输入框）
+    if (host.matches && host.matches('input, textarea')) return host.value || '';
     const inp = host.querySelector('input');
     if (inp && inp.value) return inp.value;
     const t = (host.textContent || '').trim();
@@ -738,6 +987,86 @@
     if (!x) return false;
     if (x === y) return true;
     return x.includes(y) || y.includes(x);
+  }
+
+  /**
+   * 这个字段是不是很可能有「输入之后才出现的联想列表」。
+   * 网申里学校、公司、专业这几项最常见做成远端搜索，必须选中候选才算数。
+   * 判断宁宽勿窄——只是多看一会儿有没有弹层，没有就照常当普通输入框处理。
+   */
+  function mayAutocomplete(d) {
+    if (!d) return false;
+    const s = d.signals || {};
+
+    if (s.autocomplete && s.autocomplete !== 'off') return true;
+
+    try {
+      if (d.el && d.el.getAttribute && d.el.getAttribute('aria-autocomplete')) return true;
+    } catch (e) { /* 忽略 */ }
+
+    const key = d.raKey || '';
+    if (/(^|\.)(school|company|major|university|college)$/.test(key)) return true;
+
+    const hint = (s.placeholder || '') + ' ' + (s.labelText || '');
+    if (/搜索|请输入|输入/.test(hint) && /学校|院校|公司|专业|岗位|职位/.test(hint)) return true;
+
+    return false;
+  }
+
+  /** 明确是「选择器」的容器。往它们的搜索框里塞文字而不选中，站点不会认 */
+  const SELECTISH_RE = /ant-select|el-select|ivu-select|arco-select|semi-select|n-select|t-select|select2|chosen-container|selectize/;
+
+  function isSelectish(host) {
+    if (!host) return false;
+    const cls = String(host.className && host.className.baseVal != null
+      ? host.className.baseVal : host.className || '');
+    const role = host.getAttribute ? (host.getAttribute('role') || '') : '';
+    return SELECTISH_RE.test(cls + ' ' + role);
+  }
+
+  /**
+   * 普通文本框的写入，顺带处理「联想输入」：
+   * 写值之后如果弹出了候选列表，就把完全一致的那一项点掉——
+   * 不点的话，不少站点会认为你只是打了几个字，没有真正选中学校/公司。
+   */
+  async function fillTextInput(input, variants, primary, opts = {}) {
+    const maySuggest = !!opts.maySuggest;
+    let watch = null;
+    let beforePanels = null;
+
+    // 观察器要在 focus 之前挂上：有的联想组件一获得焦点就弹出空面板，
+    // 之后的候选项是渲染进这个已存在的面板里的，不能把它算成「点开前就有」。
+    if (maySuggest) {
+      beforePanels = visibleDropdowns();
+      watch = startPanelWatch();
+    }
+
+    try { input.focus({ preventScroll: true }); } catch (e) { /* 忽略 */ }
+    record(input, 'text', input.value);
+
+    let result = { ok: true, via: 'native', written: primary };
+    try {
+      setNativeValue(input, primary);
+
+      if (maySuggest) {
+        const panel = await waitForPanel(watch, beforePanels, 900);
+        if (panel) {
+          await waitFor(() => hasOptions(panel), 700);
+
+          let hit = clickOptionIn(panel, variants);
+          if (!hit) hit = await typeToFilter(input, panel, variants);
+          if (hit) {
+            await sleep(150);
+            result = { ok: true, via: 'autocomplete', written: primary };
+          }
+        }
+      }
+    } finally {
+      if (watch) watch.stop();
+    }
+
+    triggerBlur(input);
+    return result;
   }
 
   /**
@@ -798,13 +1127,27 @@
 
       if (host || hiddenInput) {
         const r = await customWidget(host || d.el.parentElement, variants, d.el, d);
-        result = { ok: !!r.ok, reason: r.reason, via: r.via || 'custom', written: primary };
+
+        // 点不开面板不代表没救：控件本身就是可编辑的 input 时，
+        // 直接把值打进去也能用（站点通常会在这时把候选列表拉出来）。
+        // 但明确是 select 的容器不要这么干——塞进去的文字站点不会认。
+        const canTypeFallback = !r.ok && d.el.matches &&
+          d.el.matches('input') && !d.el.readOnly && !d.el.disabled &&
+          (mayAutocomplete(d) || !isSelectish(host));
+
+        if (canTypeFallback) {
+          const r2 = await fillTextInput(d.el, variants, primary, { maySuggest: true });
+          result = {
+            ok: !!r2.ok,
+            reason: r2.ok ? undefined : (r.reason || r2.reason),
+            via: r2.ok ? (r2.via || 'native-fallback') : 'custom',
+            written: primary,
+          };
+        } else {
+          result = { ok: !!r.ok, reason: r.reason, via: r.via || 'custom', written: primary };
+        }
       } else {
-        d.el.focus({ preventScroll: true });
-        record(d.el, 'text', d.el.value);
-        setNativeValue(d.el, primary);
-        triggerBlur(d.el);
-        result = { ok: true, via: 'native', written: primary };
+        result = await fillTextInput(d.el, variants, primary, { maySuggest: mayAutocomplete(d) });
       }
     }
 
@@ -911,6 +1254,9 @@
     valueFor,
     valueVariants,
     isDateKey,
+    mayAutocomplete,
+    fillTextInput,
+    visibleDropdowns,
     readBack,
     sameish,
     undoAll,

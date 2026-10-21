@@ -11,8 +11,10 @@
 
   // ─────────────────────────── 跳过规则 ───────────────────────────
 
+  // 注意：不要跳过 type=search。有些联想输入（学校 / 公司名称）就用
+  // type=search 实现，真正的站点搜索框靠下面的 JUNK_ALIASES 拦。
   const SKIP_TYPES = new Set([
-    'hidden', 'submit', 'button', 'reset', 'image', 'file', 'password', 'search',
+    'hidden', 'submit', 'button', 'reset', 'image', 'file', 'password',
   ]);
 
   /** 我们自己注入的浮层要跳过，否则会把 UI 上的输入框也当成表单字段 */
@@ -26,15 +28,54 @@
    * 整个控件就永远不会进入候选列表——这正是「下拉框完全填不了」的根因。
    */
   const WIDGET_SEL = [
-    '.ant-select', '.ant-picker', '.ant-cascader', '.ant-tree-select',
-    '.el-select', '.el-date-editor', '.el-cascader', '.el-time-picker',
+    '.ant-select', '.ant-picker', '.ant-cascader', '.ant-tree-select', '.ant-auto-complete',
+    '.el-select', '.el-date-editor', '.el-cascader', '.el-time-picker', '.el-autocomplete',
     '.ivu-select', '.ivu-date-picker', '.ivu-cascader',
-    '.van-field', '.arco-select', '.arco-picker', '.semi-select',
-    '[role="combobox"]', '[aria-haspopup="listbox"]',
+    '.van-field', '.arco-select', '.arco-picker', '.arco-cascader',
+    '.arco-tree-select', '.arco-auto-complete', '.semi-select',
+    '.n-select', '.n-base-selection', '.t-select', '.t-cascader', '.t-auto-complete',
+    '.select2-container', '.chosen-container', '.selectize-control',
+    '[role="combobox"]', '[aria-haspopup="listbox"]', '[aria-haspopup="dialog"]',
+    '[aria-autocomplete]', '[data-popper-placement]',
   ].join(',');
 
   /** 疑似验证码 / 搜索框，不要填 */
   const JUNK_ALIASES = ['验证码', '短信验证码', '图形验证码', 'captcha', 'verifycode', 'search', '搜索', '查询', 'keyword'];
+
+  /**
+   * 标签本身就是一个简历字段吗？
+   *
+   * 用来区分「站点的搜索框」和「可搜索的下拉框」：
+   * 后者经常写「请输入关键字搜索」，但它的标签是「专业」「学校名称」，
+   * 属于正经表单字段，不能因为 placeholder 里有「搜索」就被丢掉。
+   * 真正的站点搜索框一般没有表单标签（最多写个「搜索」）。
+   */
+  function labelLooksLikeField(labelText) {
+    if (!labelText) return false;
+    const defs = (RA.fields && RA.fields.DEFS) || [];
+    if (!defs.length) return false;
+
+    const norm = N.text(labelText);
+    const spaced = N.spaced(labelText);
+    if (!norm) return false;
+
+    for (const def of defs) {
+      if (N.bestMatch(def.aliases, norm, spaced)) return true;
+      if (N.bestMatch(def.generic, norm, spaced)) return true;
+    }
+    return false;
+  }
+
+  /** 验证码 / 站点搜索框：丢弃 */
+  function isJunk(signals) {
+    const all = [signals.labelText, signals.placeholder, signals.name, signals.id].join(' ');
+    const norm = N.text(all);
+    const spaced = N.spaced(all);
+    if (!N.anyMatch(JUNK_ALIASES, norm, spaced)) return false;
+    // 标签明确指向简历字段时放行（可搜索下拉的常见写法）
+    if (labelLooksLikeField(signals.labelText)) return false;
+    return true;
+  }
 
   /**
    * 动态 class（CSS-in-JS 的哈希、Angular 的 _ngcontent 之类）对匹配毫无价值，
@@ -310,6 +351,20 @@
     }
   }
 
+  const PICKER_HINT_RE = /请选择|请选取|选择|搜索|请输入|select|search|picker|choose/i;
+
+  /**
+   * readonly 的框里，有一部分其实是「点一下才弹出面板」的选择器
+   * （学校、公司、城市这类往往没有约定类名，光看 class 认不出来）。
+   * 它们有明显的提示语，可以据此放行；真正的只读计算字段不会有这种提示。
+   */
+  function looksLikePicker(el) {
+    if (el.getAttribute('aria-autocomplete')) return true;
+    if (el.hasAttribute('aria-haspopup') || el.hasAttribute('aria-expanded')) return true;
+    const hint = (el.getAttribute('placeholder') || '') + ' ' + (el.getAttribute('title') || '');
+    return PICKER_HINT_RE.test(hint);
+  }
+
   /** 判断某个控件是否应该被跳过 */
   function shouldSkip(el) {
     if (el.hasAttribute(IGNORE_ATTR)) return true;
@@ -317,8 +372,9 @@
     if (el.getAttribute('aria-hidden') === 'true') return true;
 
     // readonly 一般意味着「程序控制的框，别手填」，但自定义组件的内层 input
-    // 恰恰都是 readonly——那种要留着，交给自定义组件填充逻辑处理
-    if (el.readOnly && !inWidget(el)) return true;
+    // 恰恰都是 readonly——那种要留着，交给自定义组件填充逻辑处理。
+    // 认不出容器的选择器再看提示语放行（学校名称这类常见没有规范类名）。
+    if (el.readOnly && !inWidget(el) && !looksLikePicker(el)) return true;
 
     const type = (el.getAttribute('type') || '').toLowerCase();
     if (SKIP_TYPES.has(type)) return true;
@@ -467,10 +523,8 @@
 
       const signals = collectSignals(el);
 
-      // 验证码/搜索框直接丢弃
-      const probe = N.text(signals.labelText + ' ' + signals.placeholder + ' ' + signals.name);
-      const probeSpaced = N.spaced(signals.labelText + ' ' + signals.placeholder + ' ' + signals.name);
-      if (N.anyMatch(JUNK_ALIASES, probe, probeSpaced)) continue;
+      // 验证码/搜索框直接丢弃；标签是简历字段的可搜索下拉要留下
+      if (isJunk(signals)) continue;
 
       out.push({ el, els: [el], kind, domIndex: domIndex++, signals });
     }
@@ -503,6 +557,9 @@
     shouldSkip,
     kindOf,
     inWidget,
+    looksLikePicker,
+    isJunk,
+    labelLooksLikeField,
     WIDGET_SEL,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);
