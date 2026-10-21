@@ -306,7 +306,53 @@
   }
   .fake-dropdown [role=option] { padding: 6px 12px; cursor: pointer; font-size: 13px; }
   .fake-dropdown [role=option]:hover { background: #e6f4ff; }
+  .fake-search { position: relative; display: inline-block; }
+  .fake-dropdown .opt-empty { padding: 6px 12px; color: #999; font-size: 13px; }
 </style>
+
+<h2>14. 可搜索下拉（要输入关键字才出现选项）</h2>
+<div class="react-box">
+  <p style="margin-top:0">
+    这个下拉默认只渲染 4 个选项，必须往搜索框里打字过滤，目标项才会出现在 DOM 里。
+    扩展「先点、点不到再输入关键字」那条路径就是为它准备的。
+  </p>
+  <div class="item">
+    <span class="lbl">专业</span>
+    <div class="fake-search" id="fs-major">
+      <input type="text" placeholder="请输入关键字搜索" role="combobox"
+             aria-haspopup="listbox" aria-expanded="false">
+      <div class="fake-dropdown" hidden role="listbox"></div>
+    </div>
+  </div>
+  <p class="state">当前选中：<span id="fs-major-val">（空）</span></p>
+</div>
+
+<h2>15. 省市区三级联动（原生 select，选项异步加载）</h2>
+<div class="react-box">
+  <p style="margin-top:0">
+    城市和区县的选项要等上一级选中之后 250ms 才出现。
+    顺序写反、或者不等加载就写，都会「找不到选项」。
+  </p>
+  <div class="item"><span class="lbl">所在省份</span><select id="rg-province"></select></div>
+  <div class="item"><span class="lbl">所在城市</span><select id="rg-city"></select></div>
+  <div class="item"><span class="lbl">所在区县</span><select id="rg-district"></select></div>
+  <p class="state">当前：<span id="rg-val">（空）</span></p>
+</div>
+
+<h2>16. 日期选择器（只接受 YYYY-MM-DD 输入）</h2>
+<div class="react-box">
+  <p style="margin-top:0">
+    输入框是 readonly 的，点开之后才允许打字；输入 <code>1998-07-15</code> 回车，
+    控件会显示成「1998年07月15日」——扩展必须认得这种本地化显示。
+  </p>
+  <div class="item">
+    <span class="lbl">出生日期</span>
+    <div class="fake-date" id="fd-birth">
+      <input type="text" readonly placeholder="请选择日期" aria-haspopup="dialog">
+    </div>
+  </div>
+  <p class="state">当前：<span id="fd-birth-val">（空）</span></p>
+</div>
 
 <!-- ══════════ 日志 ══════════ -->
 <h2>事件日志</h2>
@@ -462,6 +508,133 @@ document.querySelectorAll('.fake-select').forEach((fs) => {
     if (!fs.contains(e.target)) close();
   });
 });
+</script>
+
+<script>
+// ─────────── 14. 可搜索下拉 ───────────
+(function () {
+  const MAJORS = [
+    '计算机科学与技术', '软件工程', '市场营销', '会计学', '金融学',
+    '法学', '英语', '汉语言文学', '机械设计制造及其自动化', '电子信息工程',
+    '工商管理', '心理学', '统计学', '数学与应用数学', '国际经济与贸易',
+  ];
+
+  document.querySelectorAll('.fake-search').forEach((fs) => {
+    const input = fs.querySelector('input');
+    const dd = fs.querySelector('.fake-dropdown');
+    const out = document.getElementById(fs.id + '-val');
+
+    function render() {
+      const q = input.value.trim();
+      // 不输入时只给几个，逼着扩展必须先打字
+      const list = q ? MAJORS.filter((m) => m.includes(q)) : MAJORS.slice(0, 4);
+
+      dd.textContent = '';
+      if (!list.length) {
+        const empty = document.createElement('div');
+        empty.className = 'opt-empty';
+        empty.textContent = '无匹配结果';
+        dd.appendChild(empty);
+        return;
+      }
+
+      for (const m of list) {
+        const it = document.createElement('div');
+        it.setAttribute('role', 'option');
+        it.textContent = m;
+        it.addEventListener('click', () => {
+          input.value = m;
+          if (out) out.textContent = m;
+          log('可搜索下拉选中：' + fs.id + ' = ' + m);
+          close();
+        });
+        dd.appendChild(it);
+      }
+    }
+
+    function open() { dd.hidden = false; input.setAttribute('aria-expanded', 'true'); render(); }
+    function close() { dd.hidden = true; input.setAttribute('aria-expanded', 'false'); }
+
+    input.addEventListener('mousedown', (e) => { e.preventDefault(); open(); });
+    input.addEventListener('click', open);
+    input.addEventListener('input', () => { if (!dd.hidden) render(); });
+    document.addEventListener('click', (e) => { if (!fs.contains(e.target)) close(); });
+  });
+
+  // ─────────── 15. 省市区三级联动 ───────────
+  const REGIONS = {
+    '浙江省': { '杭州市': ['西湖区', '滨江区', '余杭区'], '宁波市': ['海曙区', '鄞州区'] },
+    '上海市': { '上海市': ['徐汇区', '浦东新区', '静安区'] },
+    '江苏省': { '南京市': ['玄武区', '鼓楼区', '建邺区'], '苏州市': ['姑苏区', '吴中区'] },
+  };
+
+  const pSel = document.getElementById('rg-province');
+  const cSel = document.getElementById('rg-city');
+  const dSel = document.getElementById('rg-district');
+  const rgOut = document.getElementById('rg-val');
+
+  function fillOptions(sel, list) {
+    sel.textContent = '';
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '请选择';
+    sel.appendChild(blank);
+    for (const v of list) {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = v;
+      sel.appendChild(o);
+    }
+  }
+
+  function showRegion() {
+    if (!rgOut) return;
+    rgOut.textContent = [pSel.value, cSel.value, dSel.value].filter(Boolean).join(' / ') || '（空）';
+  }
+
+  fillOptions(pSel, Object.keys(REGIONS));
+
+  pSel.addEventListener('change', () => {
+    fillOptions(cSel, []);
+    fillOptions(dSel, []);
+    showRegion();
+    if (!pSel.value) return;
+    // 模拟异步请求：250ms 后才把城市塞进来
+    setTimeout(() => fillOptions(cSel, Object.keys(REGIONS[pSel.value] || {})), 250);
+  });
+
+  cSel.addEventListener('change', () => {
+    fillOptions(dSel, []);
+    showRegion();
+    if (!cSel.value) return;
+    setTimeout(() => fillOptions(dSel, (REGIONS[pSel.value] || {})[cSel.value] || []), 250);
+  });
+
+  dSel.addEventListener('change', showRegion);
+
+  // ─────────── 16. 日期选择器 ───────────
+  document.querySelectorAll('.fake-date').forEach((fd) => {
+    const input = fd.querySelector('input');
+    const out = document.getElementById(fd.id + '-val');
+
+    input.addEventListener('mousedown', () => {
+      input.removeAttribute('readonly');
+      input.focus();
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      const v = input.value.trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+
+      const parts = v.split('-');
+      input.value = parts[0] + '年' + parts[1] + '月' + parts[2] + '日';
+      input.setAttribute('readonly', '');
+      if (out) out.textContent = input.value;
+      log('日期选择器接受：' + fd.id + ' = ' + input.value);
+    });
+  });
+})();
 </script>
 </body>
 </html>

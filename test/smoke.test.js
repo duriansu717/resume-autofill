@@ -176,7 +176,7 @@ const EXPECTED = {
   section: ['annotate', 'findSectionTitle', 'classifySectionKind', 'findEntryContainer', 'findAddButton', 'detectDateCluster', 'inferUnit', 'looksLikeFieldLabel'],
   score: ['match', 'scoreField', 'signalSources', 'contribution', 'slotOf'],
   fill: ['setNativeValue', 'setNativeChecked', 'triggerBlur', 'selectByText', 'fillChoiceGroup',
-    'fillDateCluster', 'customWidget', 'writeOne', 'valueFor', 'valueVariants',
+    'fillDateCluster', 'customWidget', 'writeOne', 'valueFor', 'valueVariants', 'isDateKey',
     'readBack', 'sameish', 'undoAll', 'undoLast', 'waitFor', 'withTimeout', 'sleep'],
   overlay: ['showPanel', 'teardown', 'markField', 'markUnfilled', 'clearMarks',
     'setHighlight', 'clearHighlight', 'showHintBar', 'showToast', 'applyTheme', 'ensureHost'],
@@ -979,6 +979,14 @@ check('所有经历类字段都能从对应的数组里取到值', () => {
   }
 
   if (bad.length) throw new Error('取不到值：' + bad.join('；'));
+});
+
+check('日期字段靠 key 就能认出来', () => {
+  if (!RA.fill.isDateKey('educations.startDate')) throw new Error('startDate 没认出来');
+  if (!RA.fill.isDateKey('basic.birthday')) throw new Error('birthday 没认出来');
+  if (!RA.fill.isDateKey('certificates.date')) throw new Error('date 没认出来');
+  if (RA.fill.isDateKey('basic.name')) throw new Error('name 被误认成日期');
+  if (RA.fill.isDateKey('jobIntention.availableFrom')) throw new Error('到岗时间不该当日期');
 });
 
 // ─────────── 悬浮按钮的出现条件 ───────────

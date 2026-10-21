@@ -193,14 +193,52 @@
    * 按匹配结果逐个写入。
    * 返回 { rows, stats, usedEls } —— usedEls 用来判断哪些控件没被认出来。
    */
+  // 省 → 市 → 区：很多站点是三级联动，后一级的选项要等前一级选中之后才会出现
+  const REGION_ORDER = ['basic.addressProvince', 'basic.city', 'basic.addressDistrict'];
+  const REGION_RANK = { [REGION_ORDER[0]]: 0, [REGION_ORDER[1]]: 1, [REGION_ORDER[2]]: 2 };
+
+  function regionPathOf(profile) {
+    const b = (profile && profile.basic) || {};
+    return [b.addressProvince, b.city, b.addressDistrict]
+      .map((v) => (v == null ? '' : String(v).trim()));
+  }
+
   async function fillMatches(matches, profile, settings) {
     const rows = [];
     const stats = { high: 0, low: 0, fail: 0, skip: 0 };
     const usedEls = new Set();
+    const regionPath = regionPathOf(profile);
+
+    // 三级联动的下拉必须按 省 → 市 → 区 的顺序写：后一级的选项靠前一级触发生成，
+    // 顺序反了就会「没有匹配选项」。
+    matches.sort((a, b) => {
+      const ra = REGION_RANK[a.key];
+      const rb = REGION_RANK[b.key];
+      if (ra == null && rb == null) return 0;
+      if (ra == null) return 1;
+      if (rb == null) return -1;
+      return ra - rb;
+    });
+
+    let sawRegion = false;
 
     for (const m of matches) {
       const d = m.d;
       usedEls.add(d.el);
+      // 填充器靠这两个信息判断「这是日期」「这是省市区级联」
+      d.raKey = m.key;
+
+      const isRegion = REGION_RANK[m.key] != null;
+      if (isRegion && regionPath.filter(Boolean).length >= 2) {
+        d.regionPath = regionPath;
+      }
+
+      // 上一级刚写完，等这一级的选项刷新出来再动手
+      if (isRegion && sawRegion && d.kind === 'select') {
+        try {
+          await RA.fill.waitFor(() => d.el.options.length > 1, 1500);
+        } catch (e) { /* 等不到就照常写，交给回读复查兜底 */ }
+      }
 
       const entryIndex = (d.section && d.section.entryIndex) || 0;
       const raw = RA.fill.valueFor(profile, m.key, entryIndex);
@@ -230,6 +268,11 @@
       } else {
         stats.fail++;
         rows.push({ label, value: String(raw), tier: 'fail', note: res.reason || '写入失败' });
+      }
+
+      if (isRegion) {
+        sawRegion = true;
+        await RA.fill.sleep(180); // 给联动一点时间，再写下一级
       }
     }
 
@@ -328,6 +371,10 @@
       }
       d = { el: node, els: [node], kind: RA.scan.kindOf(node), domIndex: 0, signals };
     }
+
+    // 填充器靠这两个信息判断「这是日期」「这是省市区级联」
+    d.raKey = key;
+    if (REGION_RANK[key] != null) d.regionPath = regionPathOf(profile);
 
     const variants = RA.fill.valueVariants(key, raw);
     let res;

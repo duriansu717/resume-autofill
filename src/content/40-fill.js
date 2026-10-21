@@ -423,12 +423,136 @@
     return trigger;
   }
 
+  /** 这些字段的值是日期：控件不一定带 date 类名，靠 key 判断更稳 */
+  function isDateKey(key) {
+    if (!key) return false;
+    return /(^|\.)(birthday|startDate|endDate|date)$/.test(key);
+  }
+
+  /** 显示值里有没有这个年月（兼容 2021-07 / 2021年7月 / 2021/07/01 等写法） */
+  function dateShown(shown, iso) {
+    if (!shown) return false;
+    const y = iso.slice(0, 4);
+    const m = iso.slice(5, 7);
+    if (!shown.includes(y)) return false;
+    return shown.includes(m) || shown.includes(String(Number(m)));
+  }
+
+  function closePanel(trigger) {
+    try {
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true }));
+    } catch (e) { /* 忽略 */ }
+  }
+
+  /**
+   * 日期控件：优先「打字 + 回车」。
+   * YYYY-MM 和 YYYY-MM-DD 互相回退——月份选择器只认前者，日期选择器一般要后者。
+   */
+  async function typeDate(host, input, variants) {
+    const iso = variants.find((v) => /^\d{4}-\d{2}(-\d{2})?$/.test(v));
+    if (!iso) return null;
+
+    const candidates = [iso];
+    if (/^\d{4}-\d{2}$/.test(iso)) candidates.push(iso + '-01');
+    else candidates.push(iso.slice(0, 7));
+
+    const restore = unwrapReadonly(input);
+    record(input, 'text', input.value);
+
+    try {
+      for (const v of candidates) {
+        setNativeValue(input, v);
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
+        await sleep(150);
+
+        const confirmBtn = host.querySelector('button[class*="ok"], .ant-picker-ok button');
+        if (confirmBtn) confirmBtn.click();
+        await sleep(130);
+
+        // 控件显示出来的可能是本地化文本（1998年07月15日），不能直接比对原字符串
+        const shown = readDisplay(host);
+        if (dateShown(shown, v) || sameish(shown, v)) {
+          return { ok: true, via: 'date-type', value: shown };
+        }
+      }
+    } finally {
+      restore();
+    }
+
+    return { ok: false, reason: 'date-not-accepted' };
+  }
+
+  /** 弹层/控件里找一个能打字的输入框（可搜索下拉的搜索框） */
+  function findTypeableInput(host, panel) {
+    const pick = (root) => {
+      if (!root || !root.querySelectorAll) return null;
+      for (const inp of root.querySelectorAll('input')) {
+        const t = (inp.getAttribute('type') || 'text').toLowerCase();
+        if (t !== 'text' && t !== 'search') continue;
+        if (inp.readOnly || inp.disabled) continue;
+        return inp;
+      }
+      return null;
+    };
+    // 弹层里的搜索框优先，其次才是控件自身的
+    return pick(panel) || pick(host);
+  }
+
+  /**
+   * 可搜索的下拉：列表是虚拟滚动的，不输入就找不到目标项。
+   * 往搜索框里打关键字，等列表过滤之后再点。
+   */
+  async function typeToFilter(host, panel, variants) {
+    const input = findTypeableInput(host, panel);
+    if (!input) return false;
+
+    for (const v of variants) {
+      if (!v) continue;
+      const probe = v.length > 8 ? v.slice(0, 8) : v;
+      try { setNativeValue(input, probe); } catch (e) { continue; }
+
+      try {
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', keyCode: 40, bubbles: true }));
+      } catch (e) { /* 忽略 */ }
+
+      await sleep(180);
+      if (clickOptionIn(panel, variants)) return true;
+    }
+
+    try { setNativeValue(input, ''); } catch (e) { /* 忽略 */ }
+    return false;
+  }
+
+  /** 级联面板（省 → 市 → 区）：逐列点，点完一列下一列才会出现 */
+  async function clickCascader(panel, path) {
+    let any = false;
+
+    for (const part of path) {
+      if (!part) break;
+
+      const cols = panel.querySelectorAll('.ant-cascader-menu, .el-cascader-menu');
+      const scope = cols.length ? cols[cols.length - 1] : panel;
+      const hit = clickOptionIn(scope, [String(part)]);
+      if (!hit) break;
+
+      any = true;
+      await sleep(200);
+    }
+
+    return any;
+  }
+
   /**
    * 自定义组件填充。识别不出就放弃并如实报告——
    * 卡住整个流程比填不上一个字段糟糕得多。
+   *
+   * ctx 是字段描述符（可选）。带上 raKey / regionPath 之后能多处理两种形态：
+   *   · 日期控件：按字段 key 判断，不依赖类名
+   *   · 省市区级联树：按 省 → 市 → 区 逐列点击
    */
-  async function customWidget(host, variants, originalEl) {
+  async function customWidget(host, variants, originalEl, ctx) {
     const before = readDisplay(host);
+    const key = ctx && ctx.raKey;
 
     // 1) 内层藏着一个真 <select>（不少站点保留隐藏 select 做表单提交）
     const inner = host.querySelector('select');
@@ -439,28 +563,24 @@
 
     // 2) 日期类控件优先「打字」而不是「点日历格子」——点格子依赖本地化和虚拟滚动，太脆
     const dateInput = host.querySelector('input');
-    if (dateInput && /(ant-picker|el-date-editor|date)/i.test(host.className + ' ' + dateInput.className)) {
-      const restore = unwrapReadonly(dateInput);
-      const iso = variants.find((v) => /^\d{4}-\d{2}(-\d{2})?$/.test(v)) || variants[0];
-      // variants 可能为空（值是空串时就是），对 undefined 取 slice 会直接抛
-      if (!iso) { restore(); return { ok: false, reason: 'empty-value' }; }
-      record(dateInput, 'text', dateInput.value);
-      setNativeValue(dateInput, iso);
-      dateInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
-      restore();
-      await sleep(120);
-      const confirmBtn = host.querySelector('button[class*="ok"], .ant-picker-ok button');
-      if (confirmBtn) confirmBtn.click();
-      await sleep(120);
-      return { ok: readDisplay(host).includes(iso.slice(0, 7)), via: 'date-type' };
+    const isDateWidget = dateInput && (
+      /(ant-picker|el-date-editor|date)/i.test(host.className + ' ' + dateInput.className) ||
+      isDateKey(key)
+    );
+
+    if (isDateWidget) {
+      const r = await typeDate(host, dateInput, variants);
+      if (r && r.ok) return r;
+      // 打不进去就继续走弹层路径，看看能不能点格子
     }
 
-    // 3) 通用：点开 → 等弹层 → 按文字点选项
+    // 3) 通用：点开 → 等弹层
     const trigger = openWidget(host);
     const panel = await waitFor(() => {
       const p = document.querySelector(
         '[role="listbox"], [role="menu"], .ant-select-dropdown:not(.ant-select-dropdown-hidden), ' +
-        '.el-select-dropdown, .ivu-select-dropdown, .ant-picker-panel, [class*="dropdown"]'
+        '.el-select-dropdown, .ivu-select-dropdown, .ant-picker-panel, ' +
+        '.ant-cascader-dropdown, .el-cascader-panel, [class*="dropdown"]'
       );
       if (!p) return null;
       const cs = getComputedStyle(p);
@@ -472,12 +592,33 @@
       return { ok: false, reason: 'panel-not-opened' };
     }
 
-    const clicked = clickOptionIn(panel, variants);
+    // 3.1) 省市区级联树：面板里是多列，按 省 → 市 → 区 逐列点
+    const isCascader = /cascader/i.test(String(panel.className || '')) ||
+      !!panel.querySelector('.ant-cascader-menu, .el-cascader-menu');
+    const regionPath = (ctx && Array.isArray(ctx.regionPath)) ? ctx.regionPath : null;
+
+    if (isCascader && regionPath && regionPath.filter(Boolean).length >= 2) {
+      const ok = await clickCascader(panel, regionPath);
+      await sleep(140);
+
+      const after = readDisplay(host);
+      if (ok && after !== before) return { ok: true, via: 'cascader', value: after };
+
+      closePanel(trigger);
+      return { ok: false, reason: 'cascader-not-matched' };
+    }
+
+    // 3.2) 普通下拉：先直接点，点不到再输入关键字过滤（可搜索下拉）
+    let clicked = clickOptionIn(panel, variants);
+    if (!clicked) {
+      clicked = await typeToFilter(host, panel, variants);
+    }
+
     await sleep(120);
 
     if (!clicked) {
       // 关掉弹层，免得挡住用户视线
-      try { trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true })); } catch (e) {}
+      closePanel(trigger);
       return { ok: false, reason: 'option-not-found' };
     }
 
@@ -572,7 +713,7 @@
         (d.el.getBoundingClientRect().width === 0 && !!host);
 
       if (host || hiddenInput) {
-        const r = await customWidget(host || d.el.parentElement, variants, d.el);
+        const r = await customWidget(host || d.el.parentElement, variants, d.el, d);
         result = { ok: !!r.ok, reason: r.reason, via: r.via || 'custom', written: primary };
       } else {
         d.el.focus({ preventScroll: true });
@@ -685,6 +826,7 @@
     writeOne,
     valueFor,
     valueVariants,
+    isDateKey,
     readBack,
     sameish,
     undoAll,
